@@ -1,0 +1,13 @@
+node_modules/
+dist/
+artifacts/*.png
+artifacts/*.webm
+artifacts/*.mp4
+.DS_Store
+.env
+.env.*
+server/.env
+server/.env.*
+!server/.env.example
+backups/
+!.env.example
