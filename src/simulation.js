@@ -1,3 +1,4 @@
+import { isWater, isOpenWater, shoreDistance, ROCKS } from './pond-surface.js';
 export const TAU = Math.PI * 2;
 export const WORLD = { width: 1672, height: 941 };
 // World units/second. Cruise pace is roughly twice the original 22–41 range;
@@ -18,6 +19,7 @@ export class PondSimulation {
         // A private random stream keeps one fish's decisions independent of the
         // others' pauses and of unrelated rendering calls to sim.random().
         motionRandom:rng(Math.floor(r()*4294967296)),motionState:'cruise',paceMultiplier:1,motionUntil:0,nextRestAt:0,restCount:0,wakeCount:0};
+      for(let attempt=0;!isWater(f.x,f.y,f.length*.23)&&attempt<40;attempt++){f.x=100+r()*(width-200);f.y=80+r()*(height-160);}
       const initial=f.motionRandom();
       this.setMotion(f,initial<.08?'rest':initial<.30?'glide':initial>.88?'burst':'cruise');
       f.nextRestAt=3+f.motionRandom()*21;
@@ -25,6 +27,7 @@ export class PondSimulation {
       f.vx=f.speed===0?0:Math.cos(angle)*f.speed;f.vy=f.speed===0?0:Math.sin(angle)*f.speed;
       return f;
     });
+    this.previous=this.fish.map(()=>({x:0,y:0,vx:0,vy:0,angle:0,group:0}));this.boundaryHint={};
   }
   setMotion(f,state) {
     const r=f.motionRandom;
@@ -57,7 +60,7 @@ export class PondSimulation {
     }
   }
   attract(x,y) {
-    x=clamp(x,35,this.width-35); y=clamp(y,35,this.height-35);
+    if(!isOpenWater(x,y,2)||this.surface?.surfaceAt(x,y)!=='water'&&this.surface)return {selected:0,x,y,accepted:false};
     const point={x,y,created:this.time,id:++this.clicks,life:14};
     this.attractors.push(point); if(this.attractors.length>5) this.attractors.shift();
     const candidates=this.fish.map(f=>({f,d:Math.hypot(f.x-x,f.y-y)})).filter(v=>v.d<420).sort((a,b)=>a.d-b.d);
@@ -69,15 +72,16 @@ export class PondSimulation {
       f.leaveAt=this.time+8+this.random()*6; f.feedOffset=this.random()*TAU;
       selected++;
     }
-    return {id:point.id,selected,x,y};
+    return {id:point.id,selected,x,y,accepted:true};
   }
-  step(delta) {
+  step(delta,weather=null) {
     const dt=Number.isFinite(delta)?clamp(delta,0,1/20):0;
     if(dt===0)return;
     this.time+=dt;
     this.attractors=this.attractors.filter(a=>this.time-a.created<a.life);
     // Take a snapshot before the force pass: order-independent flock behavior.
-    const old=this.fish.map(f=>({x:f.x,y:f.y,vx:f.vx,vy:f.vy,angle:f.angle,group:f.group}));
+    const old=this.previous;
+    for(let i=0;i<this.fish.length;i++){const f=this.fish[i],p=old[i];p.x=f.x;p.y=f.y;p.vx=f.vx;p.vy=f.vy;p.angle=f.angle;p.group=f.group;}
     for(let i=0;i<this.fish.length;i++) {
       const f=this.fish[i], p=old[i];
       if(f.target && (this.time>f.leaveAt||this.time-f.target.created>f.target.life)) f.target=null;
@@ -103,14 +107,15 @@ export class PondSimulation {
       }
       fx+=sx*2.2;fy+=sy*2.2;
       if(neighbors>0){fx+=ax/neighbors*.76*f.sociability+cx/neighbors*.0038;fy+=ay/neighbors*.76*f.sociability+cy/neighbors*.0038;}
-      let preferred=f.baseSpeed*f.paceMultiplier*(.96+.04*Math.sin(this.time*.6+f.phase));
+      const warmth=weather?clamp((weather.temp+2)/22,.35,1):1;
+      let preferred=f.baseSpeed*f.paceMultiplier*(.96+.04*Math.sin(this.time*.6+f.phase))*warmth;
       if(interested) {
         // Independent offset and arrival steering prevent a single rotating knot.
         const age=this.time-f.target.created, spread=12+10*Math.sin(f.phase+this.time*.4);
         const dx=f.target.x+Math.cos(f.feedOffset)*spread-f.x,dy=f.target.y+Math.sin(f.feedOffset)*spread-f.y,d=Math.hypot(dx,dy);
         const interest=clamp((f.leaveAt-this.time)/2.5,0,1);
         if(d>16){fx+=dx/Math.max(d,1)*2.8*interest;fy+=dy/Math.max(d,1)*2.8*interest;}
-        preferred=f.baseSpeed*clamp(d/95,.20,1.35);
+        preferred=f.baseSpeed*clamp(d/95,.20,1.35)*warmth;
         if(age>4&&d<25) {fx+=Math.cos(f.angle+Math.sin(this.time+f.phase))*.4;fy+=Math.sin(f.angle+Math.sin(this.time+f.phase))*.4;}
       }
       // Continuous soft wall force, followed by a hard safety boundary.
@@ -119,6 +124,12 @@ export class PondSimulation {
       if(f.x>this.width-margin)fx-=(f.x-this.width+margin)/margin*5;
       if(f.y<margin)fy+=(margin-f.y)/margin*5;
       if(f.y>this.height-margin)fy-=(f.y-this.height+margin)/margin*5;
+      const boundary=shoreDistance(f.x,f.y,this.boundaryHint);
+      if(boundary.distance<65){const strength=(65-boundary.distance)/22;fx+=boundary.nx*strength;fy+=boundary.ny*strength;}
+      for(const [rx,ry,rw,rh] of ROCKS) {
+        const dx=f.x-rx,dy=f.y-ry,ellipse=(dx/(rw+28))**2+(dy/(rh+28))**2;
+        if(ellipse<1.7){const d=Math.hypot(dx,dy)||1,strength=(1.7-ellipse)*4;fx+=dx/d*strength;fy+=dy/d*strength;}
+      }
       const desired=Math.atan2(fy,fx), diff=wrap(desired-f.angle);
       const turn=clamp(diff,-f.turnRate*dt,f.turnRate*dt);
       f.angle=wrap(f.angle+turn); f.turn+=(turn/Math.max(dt,.00001)-f.turn)*Math.min(1,dt*4);
@@ -129,6 +140,7 @@ export class PondSimulation {
       if(f.motionState==='settling'&&f.speed===0){this.setMotion(f,'rest');f.tailPhase+=dt*1.6;continue;}
       f.vx=Math.cos(f.angle)*f.speed;f.vy=Math.sin(f.angle)*f.speed;
       f.x=clamp(f.x+f.vx*dt,18,this.width-18);f.y=clamp(f.y+f.vy*dt,18,this.height-18);
+      if(!isWater(f.x,f.y,f.length*.23)){f.x=p.x;f.y=p.y;f.angle=wrap(f.angle+f.turnRate*dt);}
       f.tailPhase+=dt*(4.0+f.speed*.08);
     }
   }

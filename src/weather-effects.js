@@ -1,13 +1,36 @@
 import { Container, Graphics, Sprite, Texture, Rectangle } from 'pixi.js';
-import { precipitationFrame } from './precipitation.js';
+import { precipitationFrame, createPrecipitationFrame } from './precipitation.js';
 import { lotusAppearance } from './lotus-growth.js';
 
+function snowTextures() {
+  const canvas=document.createElement('canvas');canvas.width=256;canvas.height=64;
+  const c=canvas.getContext('2d');c.strokeStyle='#eef3f0';c.fillStyle='#f4f6ef';c.lineCap='round';
+  for(let n=0;n<4;n++) {
+    c.save();c.translate(n*64+32,32);c.lineWidth=n===0?2.2:3;
+    if(n<2)for(let k=0;k<6;k++) {
+      c.save();c.rotate(k*Math.PI/3);c.beginPath();c.moveTo(0,0);c.lineTo(0,-22+n*4);
+      c.moveTo(-6,-11);c.lineTo(0,-16);c.lineTo(6,-11);c.stroke();c.restore();
+    }
+    else {
+      c.beginPath();for(let k=0;k<9;k++){const a=k*Math.PI*2/9,r=9+(k*7+n*3)%10;k?c.lineTo(Math.cos(a)*r,Math.sin(a)*r):c.moveTo(Math.cos(a)*r,Math.sin(a)*r);}c.closePath();c.fill();
+      c.globalAlpha=.35;c.fillRect(-17,-3,11,6);c.fillRect(3,8,8,5);
+    }
+    c.restore();
+  }
+  const atlas=Texture.from(canvas);
+  return Array.from({length:4},(_,i)=>new Texture({source:atlas.source,frame:new Rectangle(i*64,0,64,64)}));
+}
 export class WeatherEffects {
-  constructor(stage){this.layer=new Container();this.rain=new Graphics();this.rings=new Graphics();this.snow=new Graphics();this.layer.addChild(this.rings,this.rain,this.snow);stage.addChild(this.layer);this.frame={rain:[],impacts:[],snow:[],shaderImpacts:[]};}
-  update(time,w,view,plants=[]){
-    const rain=this.rain.clear(),rings=this.rings.clear(),snow=this.snow.clear();
+  constructor(stage,climate){
+    this.climate=climate;this.layer=new Container();this.rain=new Graphics();this.rings=new Graphics();this.snow=new Container();
+    this.layer.addChild(this.rings,this.rain,this.snow);stage.addChild(this.layer);this.frame=createPrecipitationFrame();
+    const textures=snowTextures();
+    this.flakes=Array.from({length:180},(_,i)=>{const sprite=new Sprite(textures[i%4]);sprite.anchor.set(.5);sprite.visible=false;this.snow.addChild(sprite);return sprite;});
+  }
+  update(time,w,view,plants=[],quality=1){
+    const rain=this.rain.clear(),rings=this.rings.clear();
     const {scaleX:sx,scaleY:sy,x:ox,y:oy}=view;
-    this.frame=precipitationFrame(time,w,plants);
+    precipitationFrame(time,w,plants,this.frame,this.climate,quality);
     for(const p of this.frame.rain){
       const x=p.airX*sx+ox,y=p.airY*sy+oy;
       rain.moveTo(x,y-p.length*sy).lineTo(x,y).stroke({width:(.45+p.size*.18)*sx,color:0xe8f1ea,alpha:.28+w.rain*.18});
@@ -19,7 +42,15 @@ export class WeatherEffects {
       if(age>.14)rings.ellipse(x,y,(radius-3.5)*sx,(radius-3.5)*sy).stroke({color:0x214f48,width:.65*sx,alpha:fade*.18});
       if(age<.16){rings.circle(x,y,(1.5-age*5)*sx).fill({color:0xf0f5ea,alpha:(1-age/.16)*.45});for(let k=0;k<3;k++){const a=k*Math.PI*2/3+p.id;const d=age*30;rings.circle(x+Math.cos(a)*d*sx,y+Math.sin(a)*d*sy-age*(1-age/.16)*35*sy,.65*sx).fill({color:0xeaf1e3,alpha:fade*.3});}}
     }
-    for(const p of this.frame.snow){const x=p.airX*sx+ox,y=p.airY*sy+oy;snow.circle(x,y,p.size*sx).fill({color:0xf4f6ed,alpha:p.alpha});}
+    for(let i=0;i<this.flakes.length;i++) {
+      const sprite=this.flakes[i],p=this.frame.snow[i];sprite.visible=!!p;
+      if(!p)continue;
+      const melting=!p.airborne&&p.surface==='water',shrink=melting?Math.max(.15,1-p.impactAge/ .6):1;
+      sprite.position.set(p.airX*sx+ox,p.airY*sy+oy);sprite.rotation=p.rotation;
+      sprite.scale.set(p.size*4/64*sx*(.4+.6*Math.abs(p.roll))*shrink,p.size*4/64*sy*shrink);
+      sprite.alpha=p.alpha*(melting?.5:1);
+      if(melting)rings.ellipse(p.x*sx+ox,p.y*sy+oy,(1+p.impactAge*5)*sx,(1+p.impactAge*5)*sy).stroke({width:.45,color:0xcde2dc,alpha:(1-p.impactAge/.6)*.13});
+    }
     return this.frame;
   }
 }

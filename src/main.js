@@ -5,7 +5,10 @@ import { WeatherState, LotusGrowth } from './weather.js';
 import { WeatherEffects, LotusVisuals } from './weather-effects.js';
 import { setupWeatherUI } from './weather-ui.js';
 import { ShoreLife } from './shore-life.js';
-import { STATIC_PADS } from './pond-surface.js';
+import { STATIC_PADS, isWater } from './pond-surface.js';
+import { PondClimate } from './pond-climate.js';
+import { PondLife } from './pond-life.js';
+import { FrameBudget } from './frame-budget.js';
 import { LOTUS_STORAGE_KEY } from './lotus-growth.js';
 import { celestialAt } from './celestial.js';
 import './style.css';
@@ -13,21 +16,26 @@ const host=document.querySelector('#pond');
 const app=new Application();
 const sim=new PondSimulation();
 const weather=new WeatherState(),growth=new LotusGrowth();
+const climate=new PondClimate(growth.plants),budget=new FrameBudget();sim.surface=climate;
+const renderResolution=()=>Math.min(devicePixelRatio||1,1.5,Math.sqrt(2600000*budget.quality/Math.max(1,innerWidth*innerHeight)));
 const TILT=.9; // A gentle 2.5D oblique overhead projection, not a full 3D camera.
 let paused=false,ready=false,frames=0,lastClick=null,sky=null,skyKey="",skyCheckedAt=0;
 const params=new URLSearchParams(location.search);
-await app.init({resizeTo:window,preference:'webgl',antialias:true,resolution:Math.min(devicePixelRatio,1.5),autoDensity:true,background:0x507e70,powerPreference:'high-performance'});
+await app.init({resizeTo:window,preference:'webgl',antialias:true,resolution:renderResolution(),autoDensity:true,background:0x263f38,powerPreference:'high-performance'});
 host.appendChild(app.canvas);
 app.canvas.setAttribute('aria-label','水光粼粼的池塘，44 条锦鲤自由游动。点击水面投下涟漪，吸引附近的鱼');
 app.canvas.tabIndex=0;
-const [bottom,atlas,lotusAtlas,shoreAtlas]=await Promise.all([Assets.load('/assets/pond-bottom.png'),Assets.load('/assets/koi-atlas.png'),Assets.load('/assets/lotus-growth.png'),Assets.load('/assets/shore-life.png')]);
+const [bottom,atlas,lotusAtlas,shoreAtlas,lifeAtlas,moonTexture,winterAtlas]=await Promise.all([Assets.load('/assets/pond-bottom.png'),Assets.load('/assets/koi-atlas.png'),Assets.load('/assets/lotus-growth.png'),Assets.load('/assets/shore-life.png'),Assets.load('/assets/pond-life.png'),Assets.load('/assets/moon-reference.png'),Assets.load('/assets/shore-winter.png')]);
 const world=new Container();app.stage.addChild(world);
 const bg=new Sprite(bottom);bg.width=WORLD.width;bg.height=WORLD.height;world.addChild(bg);
-const shadows=new Container();shadows.filters=[new BlurFilter({strength:1.8,quality:2})];world.addChild(shadows);
+const shadows=new Container();shadows.filters=[new BlurFilter({strength:1.5,quality:1,resolution:.5})];world.addChild(shadows);
 const fishes=new Container();world.addChild(fishes);
 const framesData=[[13,18,743,324],[789,19,732,325],[13,355,740,315],[785,358,735,315],[14,684,742,321],[788,687,733,320]];
 const textures=framesData.map(([x,y,width,height])=>new Texture({source:atlas.source,frame:new Rectangle(x,y,width,height)}));
 const COLS=20,ROWS=4;
+const tailWeights=Array.from({length:COLS+1},(_,x)=>Math.pow(1-x/COLS,2.2));
+const turnWeights=Array.from({length:COLS+1},(_,x)=>Math.pow(1-x/COLS,1.8));
+const finWeights=Array.from({length:COLS+1},(_,x)=>Math.sin(Math.PI*x/COLS));
 function fishMesh(texture,length) {
  const width=length, height=length*texture.height/texture.width;
  const vertices=new Float32Array((COLS+1)*(ROWS+1)*2),uvs=new Float32Array(vertices.length),indices=[];
@@ -48,25 +56,60 @@ const padMask=new Graphics();
 for(const [x,y,rx,ry] of STATIC_PADS)padMask.ellipse(x,y,rx,ry).fill(0xffffff);
 world.addChild(pads,padMask);pads.mask=padMask;
 const lotus=new LotusVisuals(world,lotusAtlas,growth);
-const water=createWaterFilter();world.filters=[water];world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
+const water=createWaterFilter(climate.texture,moonTexture);world.filters=[water];world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
 // Tiny bits of drifting pollen lend depth without turning the water into a particle effect.
-const motes=new Graphics();world.addChild(motes);
+const motes=new Container();world.addChild(motes);
 const shoreWorld=new Container();app.stage.addChild(shoreWorld);
-const shore=new ShoreLife(shoreWorld,shoreAtlas);
-const atmosphere=new WeatherEffects(app.stage);
+const shore=new ShoreLife(shoreWorld,shoreAtlas,winterAtlas);
+const life=new PondLife(world,shoreWorld,lifeAtlas,climate,(x,y)=>shore.canopyAt(x,y));
+const atmosphere=new WeatherEffects(app.stage,climate);
 const weatherUI=setupWeatherUI(weather,growth);
-const pollen=Array.from({length:27},()=>({x:sim.random()*WORLD.width,y:sim.random()*WORLD.height,size:.5+sim.random()*.8,phase:sim.random()*6.28}));
-function fit(){const scale=Math.max(innerWidth/WORLD.width,innerHeight/(WORLD.height*TILT));world.scale.set(scale,scale*TILT);world.position.set((innerWidth-WORLD.width*scale)/2,(innerHeight-WORLD.height*scale*TILT)/2);shoreWorld.scale.copyFrom(world.scale);shoreWorld.position.copyFrom(world.position);shore.viewport={left:-world.x/world.scale.x,right:(innerWidth-world.x)/world.scale.x,top:-world.y/world.scale.y,bottom:(innerHeight-world.y)/world.scale.y};world.filterArea=new Rectangle(0,0,innerWidth,innerHeight);}
+const pollen=Array.from({length:27},()=>{
+ const sprite=new Sprite(Texture.WHITE);sprite.tint=0xece9be;sprite.alpha=.15;const size=.5+sim.random()*.8;sprite.width=sprite.height=size; motes.addChild(sprite);
+ return {sprite,x:sim.random()*WORLD.width,y:sim.random()*WORLD.height,phase:sim.random()*6.28};
+});
+const view={scaleX:1,scaleY:1,x:0,y:0};
+let canPan=false,cameraPanX=.5,cameraPanY=.5,gesture=null;
+function syncView(){
+ shoreWorld.position.copyFrom(world.position);
+ view.scaleX=world.scale.x;view.scaleY=world.scale.y;view.x=world.x;view.y=world.y;
+ const left=Math.max(0,-world.x/world.scale.x),top=Math.max(0,-world.y/world.scale.y);
+ const right=Math.min(WORLD.width,(innerWidth-world.x)/world.scale.x),bottom=Math.min(WORLD.height,(innerHeight-world.y)/world.scale.y);
+ const u=water.resources.waterUniforms.uniforms;
+ u.uOrigin[0]=left;u.uOrigin[1]=top;u.uWorld[0]=right-left;u.uWorld[1]=bottom-top;
+}
+function panTo(x,y){
+ if(!canPan)return;
+ const overflowX=WORLD.width*world.scale.x-innerWidth,overflowY=WORLD.height*world.scale.y-innerHeight;
+ if(overflowX>.5){world.x=Math.max(-overflowX,Math.min(0,x));cameraPanX=-world.x/overflowX;}
+ if(overflowY>.5){world.y=Math.max(-overflowY,Math.min(0,y));cameraPanY=-world.y/overflowY;}
+ syncView();
+}
+function fit(){
+ const fitScale=Math.min(innerWidth/WORLD.width,innerHeight/(WORLD.height*TILT)),fillScale=Math.max(innerWidth/WORLD.width,innerHeight/(WORLD.height*TILT));
+ canPan=fitScale/fillScale<.8;
+ if(view.width!==innerWidth||view.height!==innerHeight)gesture=null;
+ view.width=innerWidth;view.height=innerHeight;
+ const scale=canPan?fillScale:fitScale;
+ world.scale.set(scale,scale*TILT);
+ world.position.set((innerWidth-WORLD.width*scale)*(canPan?cameraPanX:.5),(innerHeight-WORLD.height*scale*TILT)*(canPan?cameraPanY:.5));
+ shoreWorld.scale.copyFrom(world.scale);syncView();
+ shore.viewport={left:0,right:WORLD.width,top:0,bottom:WORLD.height};
+ // Pixi applies the container transform to filterArea: keep it in local units.
+ world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
+ app.canvas.style.cursor=canPan?'grab':'default';
+ app.canvas.setAttribute('aria-label',canPan?'水光粼粼的池塘，拖动或使用方向键查看全景，轻点水面吸引鱼群':'水光粼粼的池塘，44 条锦鲤自由游动。点击水面投下涟漪，吸引附近的鱼');
+ document.querySelector('#hint span').textContent=canPan?'拖动浏览，轻点水面互动':'轻点水面，等鱼儿游来';
+ app.renderer.resolution=renderResolution();app.renderer.resize(innerWidth,innerHeight);
+}
 window.addEventListener('resize',fit);fit();
 function deform(mesh,f) {
  const {width,height}=mesh.data,v=mesh.vertices;
- for(let y=0;y<=ROWS;y++)for(let x=0;x<=COLS;x++){
-   const u=x/COLS, tail=1-u, k=(y*(COLS+1)+x)*2;
-   const activity=f.motionState==='rest'?.12:Math.min(1,.35+f.speed/60);
-   const bend=Math.sin(f.tailPhase+u*5.3)*Math.pow(tail,2.2)*width*.095*activity;
-   const steer=-f.turn*Math.pow(tail,1.8)*width*.021;
-   const fins=Math.sin(f.tailPhase*.66)*Math.sin(Math.PI*u)*.018;
-   v[k]=(u-.5)*width;v[k+1]=(y/ROWS-.5)*height*(1+fins)+bend+steer;
+ const activity=f.motionState==='rest'?.12:Math.min(1,.35+f.speed/60),finPhase=Math.sin(f.tailPhase*.66);
+ for(let x=0;x<=COLS;x++){
+   const u=x/COLS,bend=Math.sin(f.tailPhase+u*5.3)*tailWeights[x]*width*.095*activity;
+   const steer=-f.turn*turnWeights[x]*width*.021,fins=finPhase*finWeights[x]*.018;
+   for(let y=0;y<=ROWS;y++){const k=(y*(COLS+1)+x)*2;v[k]=(u-.5)*width;v[k+1]=(y/ROWS-.5)*height*(1+fins)+bend+steer;}
  }
  mesh.position.set(f.x,f.y);mesh.rotation=f.angle;
 }
@@ -80,40 +123,63 @@ function updateSky(date=new Date()){
 }
 function updateVisuals(){
  updateSky();
- sim.fish.forEach((f,i)=>{const {mesh,shadow}=visuals[i];deform(mesh,f);deform(shadow,f);shadow.x+=5+f.depth*3;shadow.y+=7+f.depth*4;});
+ sim.fish.forEach((f,i)=>{const {mesh,shadow}=visuals[i];deform(mesh,f);shadow.vertices.set(mesh.vertices);shadow.position.set(mesh.x+5+f.depth*3,mesh.y+7+f.depth*4);shadow.rotation=mesh.rotation;mesh.alpha=(.87+f.depth*.1)*(1-climate.iceAt(f.x,f.y)*.32);});
  const u=water.resources.waterUniforms.uniforms;u.uTime=sim.time;
- const w=weather.current;u.uWeather=[w.cloud,w.light,w.wind/12,w.snow];u.uWind=[w.windX,w.windY];
- lotus.update(sim.time,w);shore.update(sim.time,w);
- const precipitation=atmosphere.update(sim.time,w,{scaleX:world.scale.x,scaleY:world.scale.y,x:world.x,y:world.y},growth.plants);
+ const w=weather.current;u.uWeather[0]=w.cloud;u.uWeather[1]=w.light;u.uWeather[2]=w.wind/12;u.uWeather[3]=w.snow;u.uWind[0]=w.windX;u.uWind[1]=w.windY;
+ u.uClimate[0]=climate.freeze;u.uClimate[1]=climate.snowCover;u.uClimate[2]=budget.quality;u.uClimate[3]=w.temp;
+ climate.updatePlants();
+ for(let i=0;i<8;i++){const leaf=climate.leaves[i],values=u['uLeaf'+i];values[0]=leaf.x;values[1]=leaf.y;values[2]=leaf.radius;}
+ lotus.update(sim.time,w);shore.snowCover=climate.snowCover;shore.winterAmount=climate.winterAmount;shore.update(sim.time,w);life.update(sim.time,w);
+ const precipitation=atmosphere.update(sim.time,w,view,growth.plants,budget.quality);
  // Real sky directions map into this fixed north-up pond. An explicit preview
  // illustrates a visible moon inside the viewport, including narrow screens.
- const offsetX=world.x/world.scale.x,offsetY=world.y/world.scale.y;
- const moonX=sky.isPreview?innerWidth/world.scale.x*.57:sky.moon.reflection.x*WORLD.width+offsetX;
- const moonY=sky.isPreview?innerHeight/world.scale.y*.29:sky.moon.reflection.y*WORLD.height+offsetY;
- u.uMoon=[moonX,moonY,sky.moon.visibility,sky.moon.illumination];
- u.uSun=[sky.sun.reflection.x*WORLD.width+offsetX,sky.sun.reflection.y*WORLD.height+offsetY,sky.sun.visibility,sky.moon.phase];
- for(let i=0;i<16;i++){const p=precipitation.shaderImpacts[i];u['uRainImpact'+i]=p?[p.x+offsetX,p.y+offsetY,p.created,w.rain]:[0,0,-100,0];}
- // Translate click coordinates through the viewport's current cover transform.
- u.uWorld=[innerWidth/world.scale.x,innerHeight/world.scale.y];
+ const moonX=sky.isPreview?WORLD.width*.57:sky.moon.reflection.x*WORLD.width;
+ const moonY=sky.isPreview?WORLD.height*.29:sky.moon.reflection.y*WORLD.height;
+ u.uMoon[0]=moonX;u.uMoon[1]=moonY;u.uMoon[2]=sky.moon.visibility;u.uMoon[3]=sky.moon.illumination;
+ u.uSun[0]=sky.sun.reflection.x*WORLD.width;u.uSun[1]=sky.sun.reflection.y*WORLD.height;u.uSun[2]=sky.sun.visibility;u.uSun[3]=sky.moon.phase;
+ for(let i=0;i<16;i++){const p=precipitation.shaderImpacts[i],values=u['uRainImpact'+i];values[0]=p?.x||0;values[1]=p?.y||0;values[2]=p?p.created:-100;values[3]=p?w.rain:0;}
  for(let i=0;i<5;i++){
-   const a=sim.attractors[i];u['uRipple'+i]=a?[a.x+world.x/world.scale.x,a.y+world.y/world.scale.y,a.created,1]:[0,0,-100,0];
+   const a=sim.attractors[i],values=u['uRipple'+i];values[0]=a?.x||0;values[1]=a?.y||0;values[2]=a?a.created:-100;values[3]=a?1:0;
  }
- motes.clear();for(const p of pollen){const x=(p.x+sim.time*(1.6+w.windX*6))%WORLD.width,y=p.y+Math.sin(sim.time*.18+p.phase)*7+Math.sin(sim.time*.07+p.phase)*w.windY*6;motes.circle(x,y,p.size).fill({color:0xece9be,alpha:.18});}
+ for(const p of pollen){const x=((p.x+sim.time*(1.6+w.windX*6))%WORLD.width+WORLD.width)%WORLD.width,y=p.y+Math.sin(sim.time*.18+p.phase)*7+Math.sin(sim.time*.07+p.phase)*w.windY*6;p.sprite.position.set(x,y);p.sprite.visible=isWater(x,y);}
 }
 app.ticker.maxFPS=60;
-app.ticker.add(t=>{frames++;const date=new Date();updateSky(date);growth.step(date.getTime());const dt=Math.min(t.deltaMS/1000,1/20);weather.step(dt,date,sky.daylight);if(!paused)sim.step(dt);updateVisuals();});
+app.ticker.add(t=>{const start=performance.now();frames++;const date=new Date();updateSky(date);growth.step(date.getTime());const dt=Math.min(t.deltaMS/1000,1/20);weather.step(dt,date,sky.daylight);if(!paused){climate.step(dt,weather.current,weather.source);sim.step(dt,weather.current);}updateVisuals();if(!paused)budget.record(start,performance.now()-start);if(budget.changed){budget.changed=false;fit();}});
+document.addEventListener('visibilitychange',()=>{budget.resetClock();if(document.hidden)app.ticker.stop();else app.ticker.start();});
 window.addEventListener('pagehide',()=>growth.persist(true));
 window.addEventListener('storage',event=>{if(event.key===LOTUS_STORAGE_KEY&&event.newValue)growth.sync(event.newValue);});
 function attractClient(clientX,clientY){
  const rect=app.canvas.getBoundingClientRect();const x=(clientX-rect.left-world.x)/world.scale.x,y=(clientY-rect.top-world.y)/world.scale.y;
- lastClick=sim.attract(x,y);document.querySelector('#hint').classList.add('quiet');return lastClick;
+ life.disturb(x,y,sim.time);lastClick=sim.attract(x,y);if(lastClick.accepted)document.querySelector('#hint').classList.add('quiet');return lastClick;
 }
-app.canvas.addEventListener('pointerdown',e=>{if(e.isPrimary&&e.button===0)attractClient(e.clientX,e.clientY);});
-function togglePause(){paused=!paused;const b=document.querySelector('#pause');b.setAttribute('aria-label',paused?'继续动画':'暂停动画');b.innerHTML=paused?'<svg viewBox="0 0 20 20"><path d="m7 4 8 6-8 6Z"/></svg>':'<svg viewBox="0 0 20 20"><path d="M7 5v10M13 5v10"/></svg>';}
+app.canvas.addEventListener('pointerdown',e=>{
+ if(!e.isPrimary||e.button!==0)return;
+ if(!canPan){attractClient(e.clientX,e.clientY);return;}
+ gesture={id:e.pointerId,x:e.clientX,y:e.clientY,worldX:world.x,worldY:world.y,dragged:false};
+ app.canvas.setPointerCapture(e.pointerId);
+});
+app.canvas.addEventListener('pointermove',e=>{
+ if(!gesture||gesture.id!==e.pointerId)return;
+ const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;
+ if(!gesture.dragged&&Math.hypot(dx,dy)>8)gesture.dragged=true;
+ if(gesture.dragged){panTo(gesture.worldX+dx,gesture.worldY+dy);app.canvas.style.cursor='grabbing';document.querySelector('#hint').classList.add('quiet');}
+});
+app.canvas.addEventListener('pointerup',e=>{
+ if(!gesture||gesture.id!==e.pointerId)return;
+ const tap=!gesture.dragged;gesture=null;
+ if(app.canvas.hasPointerCapture(e.pointerId))app.canvas.releasePointerCapture(e.pointerId);
+ app.canvas.style.cursor=canPan?'grab':'default';
+ if(tap)attractClient(e.clientX,e.clientY);
+});
+const cancelGesture=()=>{gesture=null;app.canvas.style.cursor=canPan?'grab':'default';};
+app.canvas.addEventListener('pointercancel',cancelGesture);
+app.canvas.addEventListener('lostpointercapture',cancelGesture);
+function togglePause(){paused=!paused;app.ticker.maxFPS=paused?20:60;budget.resetClock();const b=document.querySelector('#pause');b.setAttribute('aria-label',paused?'继续动画':'暂停动画');b.innerHTML=paused?'<svg viewBox="0 0 20 20"><path d="m7 4 8 6-8 6Z"/></svg>':'<svg viewBox="0 0 20 20"><path d="M7 5v10M13 5v10"/></svg>';}
 async function fullscreen(){try{document.fullscreenElement?await document.exitFullscreen():await document.documentElement.requestFullscreen();}catch(error){console.info('Fullscreen is unavailable in this preview',error.message);}}
 document.querySelector('#pause').addEventListener('click',togglePause);document.querySelector('#fullscreen').addEventListener('click',fullscreen);
-window.addEventListener('keydown',e=>{if(e.target.closest('input,button,select,textarea,summary'))return;if(e.code==='Space'){e.preventDefault();togglePause();}if(e.key.toLowerCase()==='f')fullscreen();});
+window.addEventListener('keydown',e=>{if(e.target.closest('input,button,select,textarea,summary'))return;if(canPan&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();panTo(world.x+(e.key==='ArrowLeft'?100:e.key==='ArrowRight'?-100:0),world.y+(e.key==='ArrowUp'?100:e.key==='ArrowDown'?-100:0));}if(e.code==='Space'){e.preventDefault();togglePause();}if(e.key.toLowerCase()==='f')fullscreen();});
 updateVisuals();ready=true;document.querySelector('#loading').classList.add('done');setTimeout(()=>document.querySelector('#loading')?.remove(),1200);setTimeout(()=>document.querySelector('#hint').classList.add('quiet'),9000);
 // Small deterministic observation API for verification and reproducible captures.
-window.__pond={get ready(){return ready},get renderer(){return app.renderer.name},get paused(){return paused},get frames(){return frames},get lastClick(){return lastClick},snapshot:()=>sim.snapshot(),weather:()=>({source:weather.source,preset:weather.preset,current:{...weather.current},target:{...weather.target},timeMode:weather.timeMode}),setWeather:name=>weatherUI.setDemo(name),growth:()=>growth.snapshot(),sky:()=>structuredClone(updateSky()),precipitation:()=>structuredClone(atmosphere.frame),attract:(x,y)=>sim.attract(x,y),pause:(value=true)=>{if(paused!==value)togglePause()},advance:(seconds)=>{for(let i=0;i<Math.round(seconds*60);i++){sim.step(1/60);weather.step(1/60,new Date(),updateSky().daylight);}growth.step();updateVisuals();app.render();},render:()=>app.render(),app};
+window.__pond={get ready(){return ready},get renderer(){return app.renderer.name},get paused(){return paused},get frames(){return frames},get lastClick(){return lastClick},snapshot:()=>sim.snapshot(),weather:()=>({source:weather.source,preset:weather.preset,current:{...weather.current},target:{...weather.target},timeMode:weather.timeMode}),growth:()=>growth.snapshot(),sky:()=>structuredClone(sky),climate:()=>climate.snapshot(),wildlife:()=>life.snapshot(),butterflies:()=>shore.butterflies.map(b=>({x:b.x,y:b.y,state:b.state,height:b.height,visible:b.sprite.visible})),precipitation:()=>({rain:structuredClone(atmosphere.frame.rain),impacts:structuredClone(atmosphere.frame.impacts),snow:structuredClone(atmosphere.frame.snow),shaderImpacts:structuredClone(atmosphere.frame.shaderImpacts)}),performance:()=>({...budget.snapshot(),resolution:app.renderer.resolution,drawPixels:app.canvas.width*app.canvas.height}),viewport:()=>({x:world.x,y:world.y,width:WORLD.width*world.scale.x,height:WORLD.height*world.scale.y,scaleX:world.scale.x,scaleY:world.scale.y,windowWidth:innerWidth,windowHeight:innerHeight}),waterAt:(x,y)=>isWater(x,y),surfaceAt:(x,y)=>climate.surfaceAt(x,y)};
+window.__pond.shoreLife=()=>shore.snapshot();
 if(params.has('still')){paused=true;document.querySelector('#hint').classList.add('quiet');}
