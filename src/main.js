@@ -17,7 +17,7 @@ const app=new Application();
 const sim=new PondSimulation();
 const weather=new WeatherState(),growth=new LotusGrowth();
 const climate=new PondClimate(growth.plants),budget=new FrameBudget();sim.surface=climate;
-const renderResolution=()=>Math.min(devicePixelRatio||1,1.5,Math.sqrt(2600000*budget.quality/Math.max(1,innerWidth*innerHeight)));
+const renderResolution=()=>Math.min(devicePixelRatio||1,1.5,2560/Math.max(innerWidth,innerHeight),Math.sqrt(2600000*budget.quality/Math.max(1,innerWidth*innerHeight)));
 const TILT=.9; // A gentle 2.5D oblique overhead projection, not a full 3D camera.
 let paused=false,ready=false,frames=0,lastClick=null,sky=null,skyKey="",skyCheckedAt=0;
 const params=new URLSearchParams(location.search);
