@@ -65,7 +65,11 @@ export function setupSceneStyle(initial, apply) {
   const buttons = Object.entries(PROFILES).map(([key,profile]) => {
     const button = document.createElement('button');
     button.type = 'button'; button.textContent = profile.label; button.dataset.sceneStyle = key;
-    button.addEventListener('click', async () => {
+    button.addEventListener('click', () => select(key));
+    group.append(button); return button;
+  });
+  async function select(key) {
+      if (!Object.hasOwn(PROFILES, key)) return;
       const request = ++revision;
       if (key === current) { pending = null; refresh(); return; }
       pending = key; status.textContent = '正在切换画面…'; status.hidden = false; refresh();
@@ -81,9 +85,7 @@ export function setupSceneStyle(initial, apply) {
         console.warn('Pond style could not be loaded', error);
       }
       refresh();
-    });
-    group.append(button); return button;
-  });
+  }
   function refresh() {
     group.setAttribute('aria-busy', String(pending !== null));
     if (pending === null && status.textContent === '正在切换画面…') status.hidden = true;
@@ -91,5 +93,5 @@ export function setupSceneStyle(initial, apply) {
     document.documentElement.dataset.sceneStyle = current;
   }
   refresh();
-  return { snapshot: () => ({ current, pending, cached: [...cache.keys()] }) };
+  return { select, snapshot: () => ({ current, pending, cached: [...cache.keys()] }) };
 }

@@ -61,10 +61,12 @@ export function setupWeatherUI(weather, growth) {
     updateSummary();
   }
   buttons.forEach((button) => listen(button, 'click', () => demo(button.dataset.weather)));
-  document.querySelectorAll('[data-time]').forEach((button) => listen(button, 'click', () => {
-    weather.timeMode = button.dataset.time;
-    document.querySelectorAll('[data-time]').forEach((other) => other.setAttribute('aria-pressed', String(other === button)));
-  }));
+  function setTime(mode) {
+    if (!['auto', 'day', 'night'].includes(mode)) return;
+    weather.timeMode = mode;
+    document.querySelectorAll('[data-time]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.time === mode)));
+  }
+  document.querySelectorAll('[data-time]').forEach((button) => listen(button, 'click', () => setTime(button.dataset.time)));
   function renderCredit(attributions = []) {
     credit.replaceChildren();
     const anchor = document.createElement('a');
@@ -239,6 +241,7 @@ export function setupWeatherUI(weather, growth) {
   updateSummary();
   return {
     setDemo: demo,
+    setTime,
     get locationActive() { return Boolean(activeLocation); },
     destroy: () => { cancel(); activeLocation = null; listeners.forEach((remove) => remove()); },
   };

@@ -13,6 +13,7 @@ import { savedSceneStyle, loadSceneStyle, setupSceneStyle } from './scene-style.
 import { setupTreeSeasons } from './tree-seasons.js';
 import { LOTUS_STORAGE_KEY } from './lotus-growth.js';
 import { celestialAt } from './celestial.js';
+import { wallpaper } from './wallpaper.js';
 import './style.css';
 const host=document.querySelector('#pond');
 const app=new Application();
@@ -27,7 +28,7 @@ await app.init({resizeTo:window,preference:'webgl',antialias:true,resolution:ren
 host.appendChild(app.canvas);
 app.canvas.setAttribute('aria-label','水光粼粼的池塘，44 条鱼儿自由游动。点击水面投下涟漪，吸引附近的鱼');
 app.canvas.tabIndex=0;
-const [initialStyle,moonTexture]=await Promise.all([loadSceneStyle(savedSceneStyle()),Assets.load('/assets/moon-reference.png')]);
+const [initialStyle,moonTexture]=await Promise.all([loadSceneStyle(wallpaper.enabled?wallpaper.options.style:savedSceneStyle()),Assets.load('/assets/moon-reference.png')]);
 const bottom=initialStyle.bottom;
 const world=new Container();app.stage.addChild(world);
 const bg=new Sprite(bottom);bg.width=WORLD.width;bg.height=WORLD.height;world.addChild(bg);
@@ -104,10 +105,11 @@ function panTo(x,y){
 }
 function fit(){
  const fitScale=Math.min(innerWidth/WORLD.width,innerHeight/(WORLD.height*TILT)),fillScale=Math.max(innerWidth/WORLD.width,innerHeight/(WORLD.height*TILT));
- canPan=fitScale/fillScale<.8;
+ const wallpaperFit=wallpaper.enabled?wallpaper.options.fit:null;
+ canPan=wallpaperFit==='fill'?fillScale>fitScale+.0001:wallpaperFit==='fit'?false:fitScale/fillScale<.8;
  if(view.width!==innerWidth||view.height!==innerHeight)gesture=null;
  view.width=innerWidth;view.height=innerHeight;
- const scale=canPan?fillScale:fitScale;
+ const scale=wallpaperFit==='fill'||canPan?fillScale:fitScale;
  world.scale.set(scale,scale*TILT);
  world.position.set((innerWidth-WORLD.width*scale)*(canPan?cameraPanX:.5),(innerHeight-WORLD.height*scale*TILT)*(canPan?cameraPanY:.5));
  shoreWorld.scale.copyFrom(world.scale);syncView();
@@ -161,9 +163,10 @@ function updateVisuals(){
  }
  for(const p of pollen){const x=((p.x+sim.time*(1.6+w.windX*6))%WORLD.width+WORLD.width)%WORLD.width,y=p.y+Math.sin(sim.time*.18+p.phase)*7+Math.sin(sim.time*.07+p.phase)*w.windY*6;p.sprite.position.set(x,y);p.sprite.visible=isWater(x,y);}
 }
-app.ticker.maxFPS=60;
-app.ticker.add(t=>{const start=performance.now();frames++;const date=new Date();updateSky(date);growth.step(date.getTime());const dt=Math.min(t.deltaMS/1000,1/20);weather.step(dt,date,sky.daylight);if(!paused){climate.step(dt,weather.current,weather.source);sim.step(dt,weather.current);}updateVisuals();if(!paused)budget.record(start,performance.now()-start);if(budget.changed){budget.changed=false;fit();}});
-document.addEventListener('visibilitychange',()=>{budget.resetClock();if(document.hidden)app.ticker.stop();else app.ticker.start();});
+app.ticker.maxFPS=wallpaper.fps;
+app.ticker.add(t=>{const start=performance.now();frames++;const date=new Date();updateSky(date);growth.step(date.getTime());const dt=Math.min(t.deltaMS/1000,1/20);weather.step(dt,date,sky.daylight);if(!paused){climate.step(dt,weather.current,weather.source);sim.step(dt,weather.current);}updateVisuals();if(!paused)budget.record(start,performance.now()-start,app.ticker.maxFPS);if(budget.changed){budget.changed=false;fit();}});
+function syncPlayback(){budget.resetClock();if(document.hidden||wallpaper.hostPaused)app.ticker.stop();else app.ticker.start();}
+document.addEventListener('visibilitychange',syncPlayback);
 window.addEventListener('pagehide',()=>growth.persist(true));
 window.addEventListener('storage',event=>{if(event.key===LOTUS_STORAGE_KEY&&event.newValue)growth.sync(event.newValue);});
 function attractClient(clientX,clientY){
@@ -171,6 +174,7 @@ function attractClient(clientX,clientY){
  life.disturb(x,y,sim.time);lastClick=sim.attract(x,y);if(lastClick.accepted)document.querySelector('#hint').classList.add('quiet');return lastClick;
 }
 app.canvas.addEventListener('pointerdown',e=>{
+ if(!wallpaper.interactive)return;
  if(!e.isPrimary||e.button!==0)return;
  if(!canPan){attractClient(e.clientX,e.clientY);return;}
  gesture={id:e.pointerId,x:e.clientX,y:e.clientY,worldX:world.x,worldY:world.y,dragged:false};
@@ -192,10 +196,22 @@ app.canvas.addEventListener('pointerup',e=>{
 const cancelGesture=()=>{gesture=null;app.canvas.style.cursor=canPan?'grab':'default';};
 app.canvas.addEventListener('pointercancel',cancelGesture);
 app.canvas.addEventListener('lostpointercapture',cancelGesture);
-function togglePause(){paused=!paused;app.ticker.maxFPS=paused?20:60;budget.resetClock();const b=document.querySelector('#pause');b.setAttribute('aria-label',paused?'继续动画':'暂停动画');b.innerHTML=paused?'<svg viewBox="0 0 20 20"><path d="m7 4 8 6-8 6Z"/></svg>':'<svg viewBox="0 0 20 20"><path d="M7 5v10M13 5v10"/></svg>';}
+function togglePause(){paused=!paused;app.ticker.maxFPS=paused?20:wallpaper.fps;budget.resetClock();const b=document.querySelector('#pause');b.setAttribute('aria-label',paused?'继续动画':'暂停动画');b.innerHTML=paused?'<svg viewBox="0 0 20 20"><path d="m7 4 8 6-8 6Z"/></svg>':'<svg viewBox="0 0 20 20"><path d="M7 5v10M13 5v10"/></svg>';}
 async function fullscreen(){try{document.fullscreenElement?await document.exitFullscreen():await document.documentElement.requestFullscreen();}catch(error){console.info('Fullscreen is unavailable in this preview',error.message);}}
 document.querySelector('#pause').addEventListener('click',togglePause);document.querySelector('#fullscreen').addEventListener('click',fullscreen);
-window.addEventListener('keydown',e=>{if(e.target.closest('input,button,select,textarea,summary'))return;if(canPan&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();panTo(world.x+(e.key==='ArrowLeft'?100:e.key==='ArrowRight'?-100:0),world.y+(e.key==='ArrowUp'?100:e.key==='ArrowDown'?-100:0));}if(e.code==='Space'){e.preventDefault();togglePause();}if(e.key.toLowerCase()==='f')fullscreen();});
+window.addEventListener('keydown',e=>{if(wallpaper.enabled||e.target.closest('input,button,select,textarea,summary'))return;if(canPan&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();panTo(world.x+(e.key==='ArrowLeft'?100:e.key==='ArrowRight'?-100:0),world.y+(e.key==='ArrowUp'?100:e.key==='ArrowDown'?-100:0));}if(e.code==='Space'){e.preventDefault();togglePause();}if(e.key.toLowerCase()==='f')fullscreen();});
+wallpaper.attach({
+ apply(changed){
+   if(changed.style)appearance.select(changed.style);
+   if(changed.weather)weatherUI.setDemo(changed.weather);
+   if(changed.time)weatherUI.setTime(changed.time);
+   if(changed.season)seasons.select(changed.season);
+   if(changed.fit)fit();
+   if(changed.fps){app.ticker.maxFPS=paused?20:wallpaper.fps;budget.resetClock();}
+   if(changed.interaction===false)cancelGesture();
+ },
+ playback:syncPlayback,
+});
 updateVisuals();ready=true;document.querySelector('#loading').classList.add('done');setTimeout(()=>document.querySelector('#loading')?.remove(),1200);setTimeout(()=>document.querySelector('#hint').classList.add('quiet'),9000);
 // Small deterministic observation API for verification and reproducible captures.
 window.__pond={get ready(){return ready},get renderer(){return app.renderer.name},get paused(){return paused},get frames(){return frames},get lastClick(){return lastClick},snapshot:()=>sim.snapshot(),weather:()=>({source:weather.source,preset:weather.preset,current:{...weather.current},target:{...weather.target},timeMode:weather.timeMode}),growth:()=>growth.snapshot(),sky:()=>structuredClone(sky),climate:()=>climate.snapshot(),wildlife:()=>life.snapshot(),butterflies:()=>shore.butterflies.map(b=>({x:b.x,y:b.y,state:b.state,height:b.height,visible:b.sprite.visible})),precipitation:()=>({rain:structuredClone(atmosphere.frame.rain),impacts:structuredClone(atmosphere.frame.impacts),snow:structuredClone(atmosphere.frame.snow),shaderImpacts:structuredClone(atmosphere.frame.shaderImpacts)}),performance:()=>({...budget.snapshot(),resolution:app.renderer.resolution,drawPixels:app.canvas.width*app.canvas.height}),viewport:()=>({x:world.x,y:world.y,width:WORLD.width*world.scale.x,height:WORLD.height*world.scale.y,scaleX:world.scale.x,scaleY:world.scale.y,windowWidth:innerWidth,windowHeight:innerHeight}),waterAt:(x,y)=>isWater(x,y),surfaceAt:(x,y)=>climate.surfaceAt(x,y)};
@@ -205,4 +221,5 @@ window.__pond.seasons=()=>seasons.snapshot();
 window.__pond.meshBudget=()=>({fishVertices:(COLS+1)*(ROWS+1),batchedFish:visuals.filter(v=>v.mesh.batched).length});
 window.__pond.occlusion=()=>({leafPixels:surfaceOcclusion.leafPixels,probes:[[405,522],[580,750],[192,198],[450,522],[879,864]].map(([x,y])=>({x,y,alpha:surfaceOcclusion.at(x,y)}))});
 window.__pond.landings=()=>({flowers:lotus.flowerSites.map(p=>({...p})),butterflies:shore.butterflies.map(b=>({id:b.index,state:b.state,x:b.x,y:b.y,height:b.height,perch:b.perchKind,flowerId:b.flowerId,targetX:b.targetX,targetY:b.targetY,screenY:b.sprite.y,shadowY:b.shadow.y,landings:b.landingCount||0,flowerVisits:b.flowerVisits||0}))});
+window.__pond.wallpaper=()=>({...wallpaper.snapshot(),tickerRunning:app.ticker.started,tickerFPS:app.ticker.maxFPS});
 if(params.has('still')){paused=true;document.querySelector('#hint').classList.add('quiet');}

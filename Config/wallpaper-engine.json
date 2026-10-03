@@ -1,0 +1,35 @@
+{
+  "title": "一池清漾",
+  "description": "可交互鱼池，支持卡通与自然写实、天气与季节。默认 30 帧，可调整至 60 帧，绘制最长边不超过 2560 像素。天气为离线演示。",
+  "type": "web",
+  "file": "index.html",
+  "general": {
+    "properties": {
+      "pondstyle": {
+        "order": 0, "text": "画面风格", "type": "combo", "value": "cartoon",
+        "options": [{ "label": "卡通", "value": "cartoon" }, { "label": "自然写实", "value": "natural" }]
+      },
+      "pondweather": {
+        "order": 1, "text": "演示天气", "type": "combo", "value": "clear",
+        "options": [{ "label": "晴", "value": "clear" }, { "label": "阴", "value": "cloudy" }, { "label": "雨", "value": "rain" }, { "label": "雪", "value": "snow" }, { "label": "风", "value": "wind" }]
+      },
+      "pondtime": {
+        "order": 2, "text": "昼夜", "type": "combo", "value": "auto",
+        "options": [{ "label": "随时间", "value": "auto" }, { "label": "白昼预览", "value": "day" }, { "label": "月夜预览", "value": "night" }]
+      },
+      "pondseason": {
+        "order": 3, "text": "树木季节", "type": "combo", "value": "auto",
+        "options": [{ "label": "随日期", "value": "auto" }, { "label": "春", "value": "spring" }, { "label": "夏", "value": "summer" }, { "label": "秋", "value": "autumn" }, { "label": "冬", "value": "winter" }]
+      },
+      "pondfit": {
+        "order": 4, "text": "画面适配", "type": "combo", "value": "fill",
+        "options": [{ "label": "铺满屏幕", "value": "fill" }, { "label": "完整池塘", "value": "fit" }]
+      },
+      "pondfps": {
+        "order": 5, "text": "帧率上限", "type": "combo", "value": "30",
+        "options": [{ "label": "30 帧", "value": "30" }, { "label": "60 帧", "value": "60" }]
+      },
+      "pondinteraction": { "order": 6, "text": "鼠标互动与拖动", "type": "bool", "value": true }
+    }
+  }
+}

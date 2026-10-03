@@ -34,13 +34,15 @@ export function setupTreeSeasons(onChange){
   const status=document.createElement('p');status.className='season-status';status.setAttribute('role','status');status.hidden=true;
   const buttons=Object.entries(SEASONS).map(([key,name])=>{
     const button=document.createElement('button');button.type='button';button.textContent=name;button.dataset.season=key;
-    button.addEventListener('click',()=>{mode=key;try{localStorage.setItem(STORAGE_KEY,key);}catch{ /* Keep the selected preview in memory. */ }refresh();onChange();});
+    button.addEventListener('click',()=>select(key));
     group.append(button);return button;
   });
   section.append(label,group,status);document.querySelector('.appearance-controls').after(section);
   function refresh(){for(const button of buttons)button.setAttribute('aria-pressed',String(button.dataset.season===mode));}
+  function select(key){if(!Object.hasOwn(SEASONS,key))return;mode=key;try{localStorage.setItem(STORAGE_KEY,key);}catch{ /* Keep the selected preview in memory. */ }refresh();onChange();}
   refresh();
   return {
+    select,
     current(date,cold){
       const month=date.getMonth();
       const calendar=month<2||month===11?'winter':month<5?'spring':month<8?'summer':'autumn';
