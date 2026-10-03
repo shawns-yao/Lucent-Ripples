@@ -18,7 +18,7 @@
         "options": [{ "label": "随时间", "value": "auto" }, { "label": "白昼预览", "value": "day" }, { "label": "月夜预览", "value": "night" }]
       },
       "pondseason": {
-        "order": 3, "text": "树木季节", "type": "combo", "value": "auto",
+        "order": 3, "text": "场景季节", "type": "combo", "value": "auto",
         "options": [{ "label": "随日期", "value": "auto" }, { "label": "春", "value": "spring" }, { "label": "夏", "value": "summer" }, { "label": "秋", "value": "autumn" }, { "label": "冬", "value": "winter" }]
       },
       "pondfit": {

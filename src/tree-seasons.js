@@ -29,8 +29,8 @@ export function setupTreeSeasons(onChange){
   let mode='auto',resolved='summer',wasOverridden=false;
   try{const saved=localStorage.getItem(STORAGE_KEY);if(Object.hasOwn(SEASONS,saved))mode=saved;}catch{ /* Seasonal previews also work without storage. */ }
   const section=document.createElement('div');section.className='season-controls';
-  const label=document.createElement('p');label.textContent='树木季节';
-  const group=document.createElement('div');group.id='season-options';group.setAttribute('role','group');group.setAttribute('aria-label','树木季节');
+  const label=document.createElement('p');label.textContent='场景季节';
+  const group=document.createElement('div');group.id='season-options';group.setAttribute('role','group');group.setAttribute('aria-label','场景季节');
   const status=document.createElement('p');status.className='season-status';status.setAttribute('role','status');status.hidden=true;
   const buttons=Object.entries(SEASONS).map(([key,name])=>{
     const button=document.createElement('button');button.type='button';button.textContent=name;button.dataset.season=key;
@@ -41,12 +41,12 @@ export function setupTreeSeasons(onChange){
   function refresh(){for(const button of buttons)button.setAttribute('aria-pressed',String(button.dataset.season===mode));}
   function select(key){if(!Object.hasOwn(SEASONS,key))return;mode=key;try{localStorage.setItem(STORAGE_KEY,key);}catch{ /* Keep the selected preview in memory. */ }refresh();onChange();}
   refresh();
+  function selected(date=new Date()){const month=date.getMonth();return mode==='auto'?(month<2||month===11?'winter':month<5?'spring':month<8?'summer':'autumn'):mode;}
   return {
     select,
+    selected,
     current(date,cold){
-      const month=date.getMonth();
-      const calendar=month<2||month===11?'winter':month<5?'spring':month<8?'summer':'autumn';
-      resolved=cold?'winter':mode==='auto'?calendar:mode;
+      resolved=cold?'winter':selected(date);
       const overridden=cold&&mode!=='auto'&&mode!=='winter';
       if(overridden!==wasOverridden){status.hidden=!overridden;status.textContent=overridden?'低温天气下显示冬季树景':'';wasOverridden=overridden;}
       return resolved;

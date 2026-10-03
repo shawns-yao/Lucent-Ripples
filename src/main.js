@@ -133,6 +133,7 @@ function deform(mesh,f) {
  mesh.position.set(f.x,f.y);mesh.rotation=f.angle;
 }
 function updateSky(date=new Date()){
+ if(weather.setSeason(seasons.selected(date)))weatherUI.refreshSummary();
  shore.season=seasons.current(date,climate.winter);life.seasonWinter=shore.season==='winter';
  const key=JSON.stringify([weather.timeMode,weather.location]);
  if(!sky||key!==skyKey||Math.abs(date.getTime()-skyCheckedAt)>=1000){
@@ -150,7 +151,7 @@ function updateVisuals(){
  climate.updatePlants();
  for(let i=0;i<8;i++){const leaf=climate.leaves[i],values=u['uLeaf'+i];values[0]=leaf.x;values[1]=leaf.y;values[2]=leaf.radius;}
  lotus.update(sim.time,w);shore.snowCover=climate.snowCover;shore.winterAmount=climate.winterAmount;shore.update(sim.time,w);life.update(sim.time,w);
- const precipitation=atmosphere.update(sim.time,w,view,growth.plants,budget.quality);
+ const precipitation=atmosphere.update(sim.time,w,view,growth.plants,budget.quality,seasons.selected());
  // Real sky directions map into this fixed north-up pond. An explicit preview
  // illustrates a visible moon inside the viewport, including narrow screens.
  const moonX=sky.isPreview?WORLD.width*.57:sky.moon.reflection.x*WORLD.width;
@@ -218,6 +219,7 @@ window.__pond={get ready(){return ready},get renderer(){return app.renderer.name
 window.__pond.shoreLife=()=>shore.snapshot();
 window.__pond.appearance=()=>appearance.snapshot();
 window.__pond.seasons=()=>seasons.snapshot();
+window.__pond.precipitationBudget=()=>({season:atmosphere.frame.season,rainBudget:atmosphere.frame.rainBudget,rainCount:atmosphere.frame.rainCount,snowCount:atmosphere.frame.snowCount,drawnRain:atmosphere.rain.particleChildren.length,drawnSnow:atmosphere.snow.particleChildren.length,rings:atmosphere.frame.impacts.length});
 window.__pond.meshBudget=()=>({fishVertices:(COLS+1)*(ROWS+1),batchedFish:visuals.filter(v=>v.mesh.batched).length});
 window.__pond.occlusion=()=>({leafPixels:surfaceOcclusion.leafPixels,probes:[[405,522],[580,750],[192,198],[450,522],[879,864]].map(([x,y])=>({x,y,alpha:surfaceOcclusion.at(x,y)}))});
 window.__pond.landings=()=>({flowers:lotus.flowerSites.map(p=>({...p})),butterflies:shore.butterflies.map(b=>({id:b.index,state:b.state,x:b.x,y:b.y,height:b.height,perch:b.perchKind,flowerId:b.flowerId,targetX:b.targetX,targetY:b.targetY,screenY:b.sprite.y,shadowY:b.shadow.y,landings:b.landingCount||0,flowerVisits:b.flowerVisits||0}))});

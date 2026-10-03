@@ -242,6 +242,7 @@ export function setupWeatherUI(weather, growth) {
   return {
     setDemo: demo,
     setTime,
+    refreshSummary: updateSummary,
     get locationActive() { return Boolean(activeLocation); },
     destroy: () => { cancel(); activeLocation = null; listeners.forEach((remove) => remove()); },
   };

@@ -1,5 +1,5 @@
-import { Container, Graphics, Sprite, Texture, Rectangle } from 'pixi.js';
-import { precipitationFrame, createPrecipitationFrame, SNOW_PARTICLE_LIMIT } from './precipitation.js';
+import { Container, Graphics, Sprite, Texture, Rectangle, Particle, ParticleContainer } from 'pixi.js';
+import { precipitationFrame, createPrecipitationFrame, PRECIPITATION_PARTICLES, RAIN_PARTICLE_LIMIT, SNOW_PARTICLE_LIMIT } from './precipitation.js';
 import { lotusAppearance } from './lotus-growth.js';
 
 function snowTextures() {
@@ -21,37 +21,51 @@ function snowTextures() {
   const atlas=Texture.from(canvas);
   return Array.from({length:4},(_,i)=>new Texture({source:atlas.source,frame:new Rectangle(i*64,0,64,64)}));
 }
+function rainTexture(){
+  const canvas=document.createElement('canvas');canvas.width=8;canvas.height=64;
+  const c=canvas.getContext('2d'),gradient=c.createLinearGradient(0,0,0,64);
+  gradient.addColorStop(0,'rgba(235,247,246,0)');gradient.addColorStop(.7,'rgba(235,247,246,.65)');gradient.addColorStop(1,'rgba(250,255,253,1)');
+  c.fillStyle=gradient;c.fillRect(2,0,4,64);return Texture.from(canvas);
+}
 export class WeatherEffects {
   constructor(stage,climate){
-    this.climate=climate;this.layer=new Container();this.rain=new Graphics();this.rings=new Graphics();this.snow=new Container();
+    this.climate=climate;this.layer=new Container();this.rings=new Graphics();
+    const rain=rainTexture(),textures=snowTextures();
+    this.rain=new ParticleContainer({texture:rain,dynamicProperties:{position:true,vertex:true,rotation:true,color:true}});
+    this.snow=new ParticleContainer({texture:textures[0],dynamicProperties:{position:true,vertex:true,rotation:true,color:true}});
+    this.drops=Array.from({length:RAIN_PARTICLE_LIMIT},()=>new Particle({texture:rain,anchorX:.5,anchorY:1}));
+    this.flakes=Array.from({length:SNOW_PARTICLE_LIMIT},(_,i)=>new Particle({texture:textures[i%4],anchorX:.5,anchorY:.5}));
     this.layer.addChild(this.rings,this.rain,this.snow);stage.addChild(this.layer);this.frame=createPrecipitationFrame();
-    const textures=snowTextures();
-    this.flakes=Array.from({length:SNOW_PARTICLE_LIMIT},(_,i)=>{const sprite=new Sprite(textures[i%4]);sprite.anchor.set(.5);sprite.visible=false;this.snow.addChild(sprite);return sprite;});
   }
-  update(time,w,view,plants=[],quality=1){
-    const rain=this.rain.clear(),rings=this.rings.clear();
+  update(time,w,view,plants=[],quality=1,season='default'){
+    const rings=this.rings.clear(),rainChildren=this.rain.particleChildren,snowChildren=this.snow.particleChildren;
     const {scaleX:sx,scaleY:sy,x:ox,y:oy}=view;
-    precipitationFrame(time,w,plants,this.frame,this.climate,quality);
+    precipitationFrame(time,w,plants,this.frame,this.climate,quality,season);
+    rainChildren.length=0;snowChildren.length=0;
     for(const p of this.frame.rain){
       const x=p.airX*sx+ox,y=p.airY*sy+oy;
-      rain.moveTo(x,y-p.length*sy).lineTo(x,y).stroke({width:(.65+p.size*.23)*sx,color:0xe8f1ea,alpha:.34+w.rain*.22});
-      rain.circle(x,y,.85*sx).fill({color:0xf0f5e8,alpha:.3});
+      if(x<-32||x>view.width+32||y<-32||y>view.height+p.length*sy+32)continue;
+      const drop=this.drops[p.id];drop.x=x;drop.y=y;drop.scaleX=p.width*sx/4;drop.scaleY=p.length*sy/64;drop.rotation=p.slant;drop.alpha=.45+w.rain*.2;
+      rainChildren.push(drop);
     }
+    this.rain.update();
     for(const p of this.frame.impacts){
       const x=p.x*sx+ox,y=p.y*sy+oy,age=p.impactAge,radius=1+age*25,fade=(1-age/1.05)*w.rain;
       rings.ellipse(x,y,radius*sx,radius*sy).stroke({color:0xe0f1e3,width:.75*sx,alpha:fade*.27});
       if(age>.14)rings.ellipse(x,y,(radius-3.5)*sx,(radius-3.5)*sy).stroke({color:0x214f48,width:.65*sx,alpha:fade*.18});
       if(age<.16){rings.circle(x,y,(1.5-age*5)*sx).fill({color:0xf0f5ea,alpha:(1-age/.16)*.45});for(let k=0;k<3;k++){const a=k*Math.PI*2/3+p.id;const d=age*30;rings.circle(x+Math.cos(a)*d*sx,y+Math.sin(a)*d*sy-age*(1-age/.16)*35*sy,.65*sx).fill({color:0xeaf1e3,alpha:fade*.3});}}
     }
-    for(let i=0;i<this.flakes.length;i++) {
-      const sprite=this.flakes[i],p=this.frame.snow[i];sprite.visible=!!p;
-      if(!p)continue;
+    for(const p of this.frame.snow) {
+      const x=p.airX*sx+ox,y=p.airY*sy+oy;if(x<-24||x>view.width+24||y<-24||y>view.height+24)continue;
+      const sprite=this.flakes[p.id];
       const melting=!p.airborne&&p.surface==='water',shrink=melting?Math.max(.15,1-p.impactAge/ .6):1;
-      sprite.position.set(p.airX*sx+ox,p.airY*sy+oy);sprite.rotation=p.rotation;
-      sprite.scale.set(p.size*6.5/64*sx*(.4+.6*Math.abs(p.roll))*shrink,p.size*6.5/64*sy*shrink);
+      sprite.x=x;sprite.y=y;sprite.rotation=p.rotation;
+      sprite.scaleX=p.size*6.5/64*sx*(.4+.6*Math.abs(p.roll))*shrink;sprite.scaleY=p.size*6.5/64*sy*shrink;
       sprite.alpha=p.alpha*(melting?.5:1);
+      snowChildren.push(sprite);
       if(melting)rings.ellipse(p.x*sx+ox,p.y*sy+oy,(1+p.impactAge*5)*sx,(1+p.impactAge*5)*sy).stroke({width:.45,color:0xcde2dc,alpha:(1-p.impactAge/.6)*.13});
     }
+    this.snow.update();
     return this.frame;
   }
 }
