@@ -11,6 +11,26 @@ PixiJS + WebGL 的轻微倾斜俯视鱼池。支持卡通与自然写实两种�
 
 如果双击方式被浏览器策略限制，使用下方本地服务方式。需要支持 WebGL 的现代 Chrome 或 Edge。
 
+## Wallpaper Engine 动态壁纸
+
+已购买 Wallpaper Engine 时，使用独立的 `artifacts/wallpaper-engine` 文件夹；它只包含壁纸入口、项目配置和预览图，图片与脚本均已内嵌，不依赖开发服务器。
+
+1. 在 Wallpaper Engine 中选择“打开壁纸”→“打开离线壁纸（动态）”，选择该文件夹内的 `project.json`。
+2. 在壁纸设置中选择画面风格、演示天气、昼夜、树木季节、画面适配及鼠标互动。默认 30 帧，可以切换为 60 帧；最终上限取壁纸选项和 Wallpaper Engine 全局帧率中的较小值。
+3. 壁纸默认铺满屏幕，可拖动浏览裁切部分；“完整池塘”按比例缩小。画面不显示网页按钮、提示或标题，也不处理网页的暂停、全屏快捷键。
+
+从源码重新生成壁纸文件夹：
+
+```powershell
+npm.cmd run wallpaper
+```
+
+需要在编辑器中继续修改时，可将该独立文件夹内的 `index.html` 拖到“创建壁纸”按钮。编辑器会复制整个文件夹，因此后续源码修改需要重新打包并更新编辑器中的副本。[官方导入说明](https://docs.wallpaperengine.io/en/web/first/gettingstarted.html)
+
+最高绘制边长仍为 2560 像素，总像素预算约 260 万；慢帧降级按实际设定帧率判断。接收到 Wallpaper Engine 暂停回调或页面隐藏时停止渲染，恢复时清空旧帧耗时记录。该离线包使用演示天气，自动昼夜以真实时间和北京参考坐标计算，不请求定位或真实天气服务。
+
+定向测试：通过实际壁纸 HTML 入口调用宿主的公开属性和暂停回调，检查 30／60 帧设置、全局 24 帧上限、停止与恢复、风格和冬景、鼠标互动开关、2K 和超宽屏铺满。30 帧本机浏览器预览在约 3.2 秒内采样 95 帧，保持完整画质；60 帧选项已接入，但该次预览采样不足以证明稳定达到 60 帧。冒烟测试：普通页面的控件、风格与昼夜切换正常。生产构建、普通离线及壁纸打包通过。尚未在 Wallpaper Engine 应用内导入验收，也未验证其桌面鼠标转发、多显示器和原生遮挡暂停。
+
 ## Windows PowerShell：运行源码
 
 先安装 Node.js 22.12 或更新版本（建议当前 Node.js LTS）。在解压后的 `pixi-fish-pond` 文件夹打开 PowerShell：
@@ -160,6 +180,9 @@ npm.cmd run standalone
 - `src/scene-style.js`：两套风格素材、按需加载、切换与选择保存
 - `src/tree-seasons.js`：树叶季节滤镜、日期与手动季节选择
 - `src/frame-budget.js`：帧耗时采样与绘制质量调整
+- `src/wallpaper.js`：壁纸模式、Wallpaper Engine 设置与暂停回调
+- `Config/wallpaper-engine.json`：默认 30 帧及壁纸设置选项
+- `scripts/build-wallpaper.mjs`：生成独立 Wallpaper Engine 项目文件夹
 - `src/simulation.js`：各鱼独立速度、休息、加速、点击兴趣与边界
 - `src/water.js`：曲线水纹、局部雨滴折射、太阳光斑、碎月光及四角薄霜
 - `src/celestial.js`：真实时间和选定经纬度的近似太阳/月亮方位、月相

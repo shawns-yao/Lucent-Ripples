@@ -23,7 +23,7 @@ export async function createStandaloneHtml({ wallpaper = false } = {}) {
   html = html.replace('</head>', '<style>' + await fs.readFile('src/style.css', 'utf8') + '</style></head>');
   html = html.replace('/favicon.svg', 'data:image/svg+xml,' + encodeURIComponent(await fs.readFile('public/favicon.svg', 'utf8')));
   if (wallpaper) html = html.replace('<html lang="zh-CN">', '<html lang="zh-CN" data-wallpaper="true">');
-  return html;
+  return html.replace(/[ \t]+$/gm, '');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
