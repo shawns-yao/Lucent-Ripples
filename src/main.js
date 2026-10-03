@@ -5,7 +5,7 @@ import { WeatherState, LotusGrowth } from './weather.js';
 import { WeatherEffects, LotusVisuals } from './weather-effects.js';
 import { setupWeatherUI } from './weather-ui.js';
 import { ShoreLife } from './shore-life.js';
-import { STATIC_PADS, isWater } from './pond-surface.js';
+import { STATIC_PADS, ROCKS, isWater } from './pond-surface.js';
 import { PondClimate } from './pond-climate.js';
 import { PondLife } from './pond-life.js';
 import { FrameBudget } from './frame-budget.js';
@@ -25,7 +25,7 @@ let paused=false,ready=false,frames=0,lastClick=null,sky=null,skyKey="",skyCheck
 const params=new URLSearchParams(location.search);
 await app.init({resizeTo:window,preference:'webgl',antialias:true,resolution:renderResolution(),autoDensity:true,background:0x263f38,powerPreference:'high-performance'});
 host.appendChild(app.canvas);
-app.canvas.setAttribute('aria-label','水光粼粼的池塘，44 条锦鲤自由游动。点击水面投下涟漪，吸引附近的鱼');
+app.canvas.setAttribute('aria-label','水光粼粼的池塘，44 条鱼儿自由游动。点击水面投下涟漪，吸引附近的鱼');
 app.canvas.tabIndex=0;
 const [initialStyle,moonTexture]=await Promise.all([loadSceneStyle(savedSceneStyle()),Assets.load('/assets/moon-reference.png')]);
 const bottom=initialStyle.bottom;
@@ -52,10 +52,11 @@ const visuals=sim.fish.map(f=>{
  mesh.alpha=.87+f.depth*.1;mesh.tint=0xdfebd6;shadow.tint=0x183d35;shadow.alpha=.15;
  shadows.addChild(shadow);fishes.addChild(mesh);return {mesh,shadow};
 });
-// Surface leaves occlude submerged fish; full-texture masks retain the original painterly edges.
+// Surface leaves and rocks occlude submerged fish while retaining the background edges.
 const pads=new Sprite(bottom);pads.width=WORLD.width;pads.height=WORLD.height;
 const padMask=new Graphics();
 for(const [x,y,rx,ry] of STATIC_PADS)padMask.ellipse(x,y,rx,ry).fill(0xffffff);
+for(const [x,y,rx,ry] of ROCKS)padMask.ellipse(x,y,rx,ry).fill(0xffffff);
 world.addChild(pads,padMask);pads.mask=padMask;
 const lotus=new LotusVisuals(world,initialStyle.lotus,growth);
 const water=createWaterFilter(climate.texture,moonTexture);world.filters=[water];world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
@@ -72,6 +73,9 @@ function applySceneStyle(style){
  for(let i=0;i<visuals.length;i++){
    const {mesh,shadow}=visuals[i];mesh.texture=shadow.texture=style.fishTextures[sim.fish[i].variant];
    mesh.tint=style.key==='cartoon'?0xffffff:0xe4ede0;
+   const length=sim.fish[i].length*(style.key==='cartoon'?1.35:1);
+   mesh.data.width=shadow.data.width=length;mesh.data.height=shadow.data.height=length*mesh.texture.height/mesh.texture.width;
+   mesh.data.tailStrength=style.key==='cartoon'?.7:1;
  }
  shore.setStyle(style.shore,style.winter,style.layout);
  lotus.setStyle(style.lotus);life.setStyle(style.life);
@@ -114,7 +118,7 @@ function fit(){
  // Pixi applies the container transform to filterArea: keep it in local units.
  world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
  app.canvas.style.cursor=canPan?'grab':'default';
- app.canvas.setAttribute('aria-label',canPan?'水光粼粼的池塘，拖动或使用方向键查看全景，轻点水面吸引鱼群':'水光粼粼的池塘，44 条锦鲤自由游动。点击水面投下涟漪，吸引附近的鱼');
+ app.canvas.setAttribute('aria-label',canPan?'水光粼粼的池塘，拖动或使用方向键查看全景，轻点水面吸引鱼群':'水光粼粼的池塘，44 条鱼儿自由游动。点击水面投下涟漪，吸引附近的鱼');
  document.querySelector('#hint span').textContent=canPan?'拖动浏览，轻点水面互动':'轻点水面，等鱼儿游来';
  app.renderer.resolution=renderResolution();app.renderer.resize(innerWidth,innerHeight);
 }
@@ -123,7 +127,7 @@ function deform(mesh,f) {
  const {width,height}=mesh.data,v=mesh.vertices;
  const activity=f.motionState==='rest'?.12:Math.min(1,.35+f.speed/60),finPhase=Math.sin(f.tailPhase*.66);
  for(let x=0;x<=COLS;x++){
-   const u=x/COLS,bend=Math.sin(f.tailPhase+u*5.3)*tailWeights[x]*width*.095*activity;
+   const u=x/COLS,bend=Math.sin(f.tailPhase+u*5.3)*tailWeights[x]*width*.095*activity*(mesh.data.tailStrength||1);
    const steer=-f.turn*turnWeights[x]*width*.021,fins=finPhase*finWeights[x]*.018;
    for(let y=0;y<=ROWS;y++){const k=(y*(COLS+1)+x)*2;v[k]=(u-.5)*width;v[k+1]=(y/ROWS-.5)*height*(1+fins)+bend+steer;}
  }

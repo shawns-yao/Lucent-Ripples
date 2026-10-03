@@ -30,7 +30,7 @@ export class PondLife {
       const perch=STATIC_PADS[[9,10,12][id]],group=new Container();this.frogLayer.addChild(group);
       const shadow=new Graphics().ellipse(0,2,9,4).fill({color:0x163829,alpha:.18});this.frogLayer.addChildAt(shadow,0);
       const poses=[new Sprite(this.textures[2]),new Sprite(this.textures[3])];
-      for(const sprite of poses){sprite.anchor.set(.5);sprite.width=sprite.height=35+id*2;group.addChild(sprite);}
+      for(const sprite of poses){sprite.anchor.set(.5);sprite.width=sprite.height=43+id*2;group.addChild(sprite);}
       return {id,group,shadow,poses,x:perch[0],y:perch[1],startX:perch[0],startY:perch[1],targetX:perch[0],targetY:perch[1],perch:null,heading:this.random()*TAU,state:'rest',until:3+this.random()*5,elapsed:0,duration:.5,height:0,alpha:1,phase:this.random()*TAU,landing:'leaf',jumpCount:0,waterExitCount:0,lastJumpDistance:0};
     });
     this.splashes=Array.from({length:6},()=>({x:0,y:0,born:-100}));this.splashIndex=0;
@@ -43,7 +43,7 @@ export class PondLife {
     this.textures=this.textureSets.get(atlas);
     for(const crab of this.crabs||[])crab.mesh.texture=this.textures[crab.id%2];
     for(const frog of this.frogs||[])for(let i=0;i<2;i++){
-      const sprite=frog.poses[i];sprite.texture=this.textures[2+i];sprite.width=sprite.height=35+frog.id*2;
+      const sprite=frog.poses[i];sprite.texture=this.textures[2+i];sprite.width=sprite.height=43+frog.id*2;
     }
   }
   crabTarget(crab,time) {
