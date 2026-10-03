@@ -1,7 +1,7 @@
 import { rng } from './simulation.js';
 import { isOpenWater } from './pond-surface.js';
 export const RAIN_PARTICLE_LIMIT=7200;
-export const SNOW_PARTICLE_LIMIT=360;
+export const SNOW_PARTICLE_LIMIT=1440;
 const RAIN_PROFILES={
   default:{count:1440,height:125,fall:.48,width:1,length:1.2},
   spring:{count:2160,height:100,fall:.55,width:.65,length:.8},
@@ -27,13 +27,15 @@ export function rainParticle(p,time,weather,out={},profile=RAIN_PROFILES.default
   return out;
 }
 export function snowParticle(p,time,weather,out={}){
-  const duration=2.8+p.speed*1.4,clock=time+p.phase,cycle=Math.floor(clock/duration),age=clock-cycle*duration,fall=duration-.6;
+  const duration=2.5+p.speed*1.5+p.depth*.6,clock=time+p.phase,cycle=Math.floor(clock/duration),age=clock-cycle*duration,fall=duration-.6;
   landing(p,cycle,out);const progress=Math.min(age/fall,1),height=1-progress;
   out.id=p.id;out.airborne=age<fall;out.progress=progress;out.impactAge=age-fall;
-  out.size=p.size*(.7+height*1.2);out.alpha=age<fall?Math.min(.78,age*3):Math.max(0,(duration-age)/.6)*.42;
+  const near=Math.pow(p.depth,5),opacity=.24+p.depth*.43;
+  out.depth=p.depth;out.size=(.32+p.size*.22+near*2.4)*(.8+height*.45);
+  out.alpha=age<fall?Math.min(opacity,age*3):Math.max(0,(duration-age)/.6)*opacity*.55;
   out.rotation=p.phase+age*(.5+p.speed*.7);out.roll=Math.cos(age*(1.1+p.speed)+p.phase);
-  out.airX=out.x+height*weather.windX*13+Math.sin(age*2+p.phase)*height*5;
-  out.airY=out.y-height*80;
+  out.airX=out.x+height*weather.windX*(16+near*36)+Math.sin(age*(1+p.speed)+p.phase)*height*(3+near*7);
+  out.airY=out.y-height*(70+p.depth*70);
   return out;
 }
 export function createPrecipitationFrame(){

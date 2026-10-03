@@ -1,25 +1,26 @@
 import { Container, Graphics, Sprite, Texture, Rectangle, Particle, ParticleContainer } from 'pixi.js';
 import { precipitationFrame, createPrecipitationFrame, PRECIPITATION_PARTICLES, RAIN_PARTICLE_LIMIT, SNOW_PARTICLE_LIMIT } from './precipitation.js';
 import { lotusAppearance } from './lotus-growth.js';
+import { rng } from './simulation.js';
 
 function snowTextures() {
-  const canvas=document.createElement('canvas');canvas.width=256;canvas.height=64;
-  const c=canvas.getContext('2d');c.fillStyle='#f4f6ef';
-  for(let n=0;n<4;n++) {
+  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=64;
+  const c=canvas.getContext('2d');
+  for(let n=0;n<8;n++) {
     c.save();c.translate(n*64+32,32);
-    const points=7+n;
-    c.beginPath();
-    for(let k=0;k<points;k++) {
-      const a=k*Math.PI*2/points+Math.sin(k*3.7+n)*.17;
-      const r=8+(k*11+n*7)%17,x=Math.cos(a)*r,y=Math.sin(a)*r*(.6+n*.12);
-      k?c.lineTo(x,y):c.moveTo(x,y);
+    const random=rng(5913+n*717),soft=n>=4;
+    c.fillStyle='#f4f8f8';c.shadowColor='rgba(239,248,250,.5)';c.shadowBlur=soft?3:1;
+    // A loose aggregate of ice grains retains gaps and feathered edges at close range.
+    for(let k=0;k<(soft?38:24);k++){
+      const angle=random()*Math.PI*2,r=Math.pow(random(),.8)*(soft?19:13);
+      const x=Math.cos(angle)*r,y=Math.sin(angle)*r*(.5+n%3*.15),width=2+random()*4,height=1+random()*3;
+      c.save();c.translate(x,y);c.rotate(random()*Math.PI);c.globalAlpha=(.3+random()*.4)*(1-r/(soft?26:20));
+      c.beginPath();c.moveTo(-width,0);c.quadraticCurveTo(-width*.4,-height,width*.5,-height*.6);c.quadraticCurveTo(width,height*.4,0,height);c.quadraticCurveTo(-width*.6,height*.5,-width,0);c.fill();c.restore();
     }
-    c.closePath();c.fill();
-    c.globalAlpha=.45;c.beginPath();c.moveTo(-22,7);c.lineTo(-16,5);c.lineTo(-18,12);c.closePath();c.fill();
     c.restore();
   }
   const atlas=Texture.from(canvas);
-  return Array.from({length:4},(_,i)=>new Texture({source:atlas.source,frame:new Rectangle(i*64,0,64,64)}));
+  return Array.from({length:8},(_,i)=>new Texture({source:atlas.source,frame:new Rectangle(i*64,0,64,64)}));
 }
 function rainTexture(){
   const canvas=document.createElement('canvas');canvas.width=8;canvas.height=64;
@@ -34,7 +35,7 @@ export class WeatherEffects {
     this.rain=new ParticleContainer({texture:rain,dynamicProperties:{position:true,vertex:true,rotation:true,color:true}});
     this.snow=new ParticleContainer({texture:textures[0],dynamicProperties:{position:true,vertex:true,rotation:true,color:true}});
     this.drops=Array.from({length:RAIN_PARTICLE_LIMIT},()=>new Particle({texture:rain,anchorX:.5,anchorY:1}));
-    this.flakes=Array.from({length:SNOW_PARTICLE_LIMIT},(_,i)=>new Particle({texture:textures[i%4],anchorX:.5,anchorY:.5}));
+    this.flakes=Array.from({length:SNOW_PARTICLE_LIMIT},(_,i)=>new Particle({texture:textures[i%4+(PRECIPITATION_PARTICLES[i].depth>.7?4:0)],anchorX:.5,anchorY:.5}));
     this.layer.addChild(this.rings,this.rain,this.snow);stage.addChild(this.layer);this.frame=createPrecipitationFrame();
   }
   update(time,w,view,plants=[],quality=1,season='default'){
@@ -60,7 +61,7 @@ export class WeatherEffects {
       const sprite=this.flakes[p.id];
       const melting=!p.airborne&&p.surface==='water',shrink=melting?Math.max(.15,1-p.impactAge/ .6):1;
       sprite.x=x;sprite.y=y;sprite.rotation=p.rotation;
-      sprite.scaleX=p.size*6.5/64*sx*(.4+.6*Math.abs(p.roll))*shrink;sprite.scaleY=p.size*6.5/64*sy*shrink;
+      sprite.scaleX=p.size*8/64*sx*(.4+.6*Math.abs(p.roll))*shrink;sprite.scaleY=p.size*8/64*sy*shrink;
       sprite.alpha=p.alpha*(melting?.5:1);
       snowChildren.push(sprite);
       if(melting)rings.ellipse(p.x*sx+ox,p.y*sy+oy,(1+p.impactAge*5)*sx,(1+p.impactAge*5)*sy).stroke({width:.45,color:0xcde2dc,alpha:(1-p.impactAge/.6)*.13});
