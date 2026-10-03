@@ -68,7 +68,8 @@ export class ShoreLife {
     this.random=random;this.lastTime=0;
     this.bees = Array.from({ length: 7 }, (_, index) => {
       const sprite = this.makeInsect(this.textures[2]);
-      return { sprite, index, phase: random() * TAU, delay: random() * 31,
+      const shadow=new Graphics().ellipse(0,0,2.8,1).fill({color:0x263f32,alpha:.15});this.shadowLayer.addChild(shadow);
+      return { sprite, shadow, index, phase: random() * TAU, delay: random() * 31,
         period: 20 + random() * 15, reach: 82 + random() * 140,
         drift: -.4 + random() * 1.25, size: 7.5 + random() * 2.2 };
     });
@@ -76,9 +77,10 @@ export class ShoreLife {
       const sprite = this.makeButterfly(this.textures[3]);
       const starts=[[240,195],[1330,270],[220,700],[1270,700],[600,100]],start=starts[index];
       const shadow=new Graphics().ellipse(0,0,5,1.8).fill({color:0x263f32,alpha:.13});this.shadowLayer.addChild(shadow);
-      return { sprite, shadow, index, phase: random() * TAU, speed: 48 + random() * 34,
-        size: 18 + random() * 6, x:start[0],y:start[1],heading:random()*TAU,height:8,
-        targetX:start[0]+120,targetY:start[1]+60,state:'flight',until:4+random()*6 };
+      return { sprite, shadow, index, phase: random() * TAU, speed: 100 + random() * 45,
+        size: 18 + random() * 6, x:start[0],y:start[1],heading:random()*TAU,height:32,
+        cruiseHeight:38+random()*22,landingHeight:0,flowerId:null,perchKind:null,
+        targetX:start[0]+120,targetY:start[1]+60,state:'flight',until:2+index*.8 };
     });
     this.fireflies = Array.from({ length: 18 }, (_, index) => ({
       index, phase: random() * TAU, speed: .23 + random() * .26,
@@ -162,23 +164,53 @@ export class ShoreLife {
     };
   }
 
+  butterflyPerch(b) {
+    const flowers=(this.flowerSites||[]).filter(p=>p.available&&!this.canopyAt(p.x,p.y)&&
+      !this.butterflies.some(other=>other!==b&&other.flowerId===p.id));
+    flowers.sort((a,c)=>Math.hypot(a.x-b.x,a.y-b.y)-Math.hypot(c.x-b.x,c.y-b.y));
+    if(flowers.length){const p=flowers[0];b.flowerId=p.id;b.perchKind='flower';b.landingHeight=p.height;b.targetX=p.x;b.targetY=p.y;return;}
+    const pads=STATIC_PADS.filter(([x,y])=>!this.canopyAt(x,y)&&
+      !this.butterflies.some(other=>other!==b&&other.perchKind==='leaf'&&Math.hypot(other.targetX-x,other.targetY-y)<40));
+    const perch=pads.length?pads[Math.floor(this.random()*pads.length)]:SHORE[10];
+    b.flowerId=null;b.perchKind=pads.length?'leaf':'shore';b.landingHeight=0;b.targetX=perch[0];b.targetY=perch[1];
+  }
+
+  takeoffButterfly(b,time,width,height) {
+    b.flowerId=null;b.perchKind=null;b.state='takeoff';b.until=time+.65;
+    const direction=b.heading+(this.random()-.5)*1.4,distance=160+this.random()*180;
+    b.targetX=clamp(b.x+Math.cos(direction)*distance,45,width-45);
+    b.targetY=clamp(b.y+Math.sin(direction)*distance,45,height-45);
+  }
+
   flyButterfly(b,time,dt,width,height) {
-    if(time>=b.until) {
-      const perched=b.state==='rest';b.state=perched?'flight':'rest';b.until=time+(perched?5+this.random()*8:1.5+this.random()*3);
-      if(perched) {
-        const perch=this.random()<.45?STATIC_PADS[Math.floor(this.random()*STATIC_PADS.length)]:SHORE[Math.floor(this.random()*SHORE.length)];
-        b.targetX=clamp(perch[0]+(this.random()-.5)*50,40,width-40);b.targetY=clamp(perch[1]+(this.random()-.5)*40,40,height-40);
-      }
+    if(b.flowerId!==null) {
+      const site=this.flowerSites?.find(p=>p.id===b.flowerId&&p.available);
+      if(site){b.targetX=site.x;b.targetY=site.y;b.landingHeight=site.height;}
+      else this.takeoffButterfly(b,time,width,height);
     }
-    if(b.state==='flight') {
-      const dx=b.targetX-b.x,dy=b.targetY-b.y,d=Math.hypot(dx,dy);
-      const desired=Math.atan2(dy,dx)+Math.sin(time*2.4+b.phase)*.23;
-      b.heading+=Math.atan2(Math.sin(desired-b.heading),Math.cos(desired-b.heading))*Math.min(1,dt*4.2);
-      const speed=Math.min(d*2,b.speed*(.82+.18*Math.sin(time*1.1+b.phase)));
-      b.x=clamp(b.x+Math.cos(b.heading)*speed*dt,25,width-25);b.y=clamp(b.y+Math.sin(b.heading)*speed*dt,25,height-25);
-      if(d<12){b.state='rest';b.until=time+2+this.random()*3;}
+    if(b.state==='rest') {
+      b.x=b.targetX;b.y=b.targetY;b.height=b.landingHeight;
+      if(time>=b.until)this.takeoffButterfly(b,time,width,height);
+      else return;
     }
-    b.height+=((b.state==='flight'?11+Math.sin(time*2+b.phase)*4:0)-b.height)*Math.min(1,dt*3);
+    if(b.state==='takeoff'&&time>=b.until){b.state='flight';b.until=time+2.5+this.random()*3.5;}
+    if(b.state==='flight'&&(time>=b.until||Math.hypot(b.targetX-b.x,b.targetY-b.y)<24)) {
+      this.butterflyPerch(b);b.state='approach';
+    }
+    const dx=b.targetX-b.x,dy=b.targetY-b.y,d=Math.hypot(dx,dy);
+    const approaching=b.state==='approach';
+    const desired=Math.atan2(dy,dx)+(approaching?0:Math.sin(time*3.1+b.phase)*.28);
+    b.heading+=Math.atan2(Math.sin(desired-b.heading),Math.cos(desired-b.heading))*Math.min(1,dt*(approaching?7:4.8));
+    const speed=Math.min(d*(approaching?3:2),b.speed*(b.state==='takeoff'?.45:.9+.22*Math.sin(time*2.2+b.phase)));
+    b.x=clamp(b.x+Math.cos(b.heading)*speed*dt,25,width-25);
+    b.y=clamp(b.y+Math.sin(b.heading)*speed*dt,25,height-25);
+    const cruise=b.cruiseHeight+Math.sin(time*3+b.phase)*9+Math.sin(time*1.1+b.phase)*5;
+    const targetHeight=approaching?b.landingHeight+clamp(d/150)*(b.cruiseHeight-b.landingHeight):cruise;
+    b.height+=(targetHeight-b.height)*Math.min(1,dt*(approaching?5:4));
+    if(approaching&&d<3&&Math.abs(b.height-b.landingHeight)<1.8) {
+      b.x=b.targetX;b.y=b.targetY;b.height=b.landingHeight;b.state='rest';b.until=time+3+this.random()*4;
+      b.landingCount=(b.landingCount||0)+1;if(b.perchKind==='flower')b.flowerVisits=(b.flowerVisits||0)+1;
+    }
   }
 
   update(time, weather = {}, width = WORLD.width, height = WORLD.height) {
@@ -237,13 +269,16 @@ export class ShoreLife {
       const point = this.beePoint(bee, time, this.hive.x, this.hive.y);
       const next = this.beePoint(bee, time + .04, this.hive.x, this.hive.y);
       const sprite = bee.sprite;
-      sprite.position.set(clamp(point.x, 8, width - 8), clamp(point.y, 8, height - 8));
+      const flightHeight=(20+Math.sin(time*6+bee.phase)*6+Math.sin(time*2+bee.phase)*5)*point.alpha;
+      sprite.position.set(clamp(point.x, 8, width - 8), clamp(point.y-flightHeight, 8, height - 8));
       sprite.rotation = Math.atan2(next.y - point.y, next.x - point.x) + Math.PI / 2;
       const base = bee.size / sprite.texture.width;
       sprite.scale.set(base * (.76 + Math.abs(Math.sin(time * 66 + bee.phase)) * .24), base);
       sprite.alpha = day * point.alpha * .91;
       sprite.tint = insectTint;
       sprite.visible = sprite.alpha > .005;
+      bee.shadow.position.set(point.x+flightHeight*.24,point.y+flightHeight*.15);bee.shadow.scale.set(1+flightHeight*.015);
+      bee.shadow.alpha=day*point.alpha*.4/(1+flightHeight*.035);bee.shadow.visible=sprite.visible;
     }
 
     for (const butterfly of this.butterflies) {
@@ -251,13 +286,18 @@ export class ShoreLife {
       const sprite = butterfly.sprite;
       sprite.position.set(butterfly.x,butterfly.y-butterfly.height);
       sprite.rotation=butterfly.heading+Math.PI/2;
-      const base=butterfly.size/this.textures[3].width;sprite.scale.set(base);
-      const wing=butterfly.state==='flight'?.18+Math.abs(Math.sin(time*(11+butterfly.index*.6)+butterfly.phase))*.82:.5+Math.sin(time*1.4+butterfly.phase)*.08;
-      for(const part of sprite.wings)part.scale.x=wing;
+      const base=butterfly.size/this.textures[3].width;sprite.scale.set(base*(1+butterfly.height*.0015));
+      const resting=butterfly.state==='rest',beat=Math.sin(time*(18+butterfly.index*.8)+butterfly.phase);
+      const wing=resting?.6+Math.sin(time*1.4+butterfly.phase)*.12:.14+Math.abs(beat)*.86;
+      sprite.skew.y=resting?0:Math.sin(time*3.1+butterfly.phase)*.1;
+      for(let i=0;i<2;i++){const part=sprite.wings[i];part.scale.x=wing;part.rotation=resting?0:beat*(i?-.1:.1);}
       sprite.alpha = day * .85;
       sprite.tint = insectTint;
       sprite.visible = sprite.alpha > .005;
-      butterfly.shadow.position.set(butterfly.x+3,butterfly.y+2);butterfly.shadow.alpha=day*.6;butterfly.shadow.visible=sprite.visible;
+      const onFlower=resting&&butterfly.perchKind==='flower';
+      butterfly.shadow.position.set(butterfly.x+butterfly.height*.24,butterfly.y+(onFlower?-butterfly.height+2:butterfly.height*.16));
+      butterfly.shadow.scale.set(1+butterfly.height*.014,1+butterfly.height*.02);
+      butterfly.shadow.alpha=day*(onFlower?.35:.8)/(1+butterfly.height*.035);butterfly.shadow.visible=sprite.visible;
     }
 
     const glow = this.fireflyLayer;
@@ -268,7 +308,7 @@ export class ShoreLife {
         const x = (side === 0 ? .07 + fly.x * .18 : side === 1 ? .80 + fly.x * .16 : .18 + fly.x * .62) * width
           + Math.sin(time * fly.speed + fly.phase) * 19;
         const y = (side === 2 ? .82 + fly.y * .11 : .17 + fly.y * .61) * height
-          + Math.cos(time * fly.speed * .7 + fly.phase) * 12;
+          + Math.cos(time * fly.speed * .7 + fly.phase) * 12-(18+Math.sin(time*1.7+fly.phase)*8);
         const pulse = .05 + .95 * Math.pow(.5 + .5 * Math.sin(time * 1.45 + fly.phase), 5);
         const alpha = pulse * night;
         // Glows stay luminous while the foliage receives its cooler night tint.
