@@ -50,9 +50,20 @@ function demoTarget(name,season){
   return normalizeWeather(target);
 }
 export class WeatherState {
-  constructor(preset='clear') {this.source='demo';this.preset=preset;this.season='default';this.timeMode='auto';this.location=null;this.current=normalizeWeather({...WEATHER_PRESETS[preset],light:deviceDaylight()});this.target={...this.current};}
-  setSeason(season){if(this.season===season)return false;this.season=season;if(this.source!=='demo')return false;this.target=demoTarget(this.preset,season);return true;}
-  setPreset(name){if(!WEATHER_PRESETS[name])throw new Error('未知演示天气');this.source='demo';this.preset=name;this.target=demoTarget(name,this.season);if(name==='night')this.timeMode='night';}
+  constructor(preset='clear') {this.source='demo';this.preset=preset;this.season='default';this.timeMode='auto';this.location=null;this.current=normalizeWeather({...WEATHER_PRESETS[preset],light:deviceDaylight()});this.target={...this.current};this.visual={...this.current};}
+  setSeason(season){
+    if(this.season===season)return false;this.season=season;
+    if(this.source==='demo'){
+      if(season!=='winter'){
+        if(this.preset==='snow')this.preset='cloudy';
+        this.current.snow=0;this.current.temp=Math.max(7,this.current.temp);
+      }
+      this.target=demoTarget(this.preset,season);
+    }
+    return true;
+  }
+  setPreset(name){if(!WEATHER_PRESETS[name])throw new Error('未知演示天气');if(name==='snow'&&this.season!=='winter')return false;this.source='demo';this.preset=name;this.target=demoTarget(name,this.season);if(name==='night')this.timeMode='night';return true;}
+  forScene(){Object.assign(this.visual,this.current);if(this.season!=='winter')this.visual.snow=0;return this.visual;}
   setLive(body,location){this.target=fromQWeather(body,location);this.location={lat:location.lat,lon:location.lon,label:location.name||location.label||'所选位置'};this.source='live';this.preset=null;}
   step(seconds,date=new Date(),astronomicalLight=null){this.target.light=this.timeMode==='day'?1:this.timeMode==='night'?.12:Number.isFinite(astronomicalLight)?clamp(astronomicalLight,.12,1):this.location?daylightAt(date,this.location.lat,this.location.lon):deviceDaylight(date);const blend=1-Math.exp(-clamp(seconds,0,.1)/3.5);for(const key of ['temp','cloud','rain','snow','wind','windX','windY','light'])this.current[key]+=(this.target[key]-this.current[key])*blend;this.current.label=this.target.label;return this.current;}
 }

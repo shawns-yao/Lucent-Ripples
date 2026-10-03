@@ -133,7 +133,12 @@ function deform(mesh,f) {
  mesh.position.set(f.x,f.y);mesh.rotation=f.angle;
 }
 function updateSky(date=new Date()){
- if(weather.setSeason(seasons.selected(date)))weatherUI.refreshSummary();
+ if(weather.setSeason(seasons.selected(date))){
+   weatherUI.refreshSummary();
+   if(weather.source==='demo'&&weather.season!=='winter'){
+     climate.freeze=0;climate.snowCover=0;climate.airTemp=weather.current.temp;climate.waterTemp=weather.current.temp;
+   }
+ }
  shore.season=seasons.current(date,climate.winter);life.seasonWinter=shore.season==='winter';
  const key=JSON.stringify([weather.timeMode,weather.location]);
  if(!sky||key!==skyKey||Math.abs(date.getTime()-skyCheckedAt)>=1000){
@@ -146,7 +151,7 @@ function updateVisuals(){
  updateSky();
  sim.fish.forEach((f,i)=>{const {mesh,shadow}=visuals[i];deform(mesh,f);shadow.vertices.set(mesh.vertices);shadow.position.set(mesh.x+5+f.depth*3,mesh.y+7+f.depth*4);shadow.rotation=mesh.rotation;mesh.alpha=(.87+f.depth*.1)*(1-climate.iceAt(f.x,f.y)*.32);});
  const u=water.resources.waterUniforms.uniforms;u.uTime=sim.time;
- const w=weather.current;u.uWeather[0]=w.cloud;u.uWeather[1]=w.light;u.uWeather[2]=w.wind/12;u.uWeather[3]=w.snow;u.uWind[0]=w.windX;u.uWind[1]=w.windY;
+ const w=weather.forScene();u.uWeather[0]=w.cloud;u.uWeather[1]=w.light;u.uWeather[2]=w.wind/12;u.uWeather[3]=w.snow;u.uWind[0]=w.windX;u.uWind[1]=w.windY;
  u.uClimate[0]=climate.freeze;u.uClimate[1]=climate.snowCover;u.uClimate[2]=budget.quality;u.uClimate[3]=w.temp;
  climate.updatePlants();
  for(let i=0;i<8;i++){const leaf=climate.leaves[i],values=u['uLeaf'+i];values[0]=leaf.x;values[1]=leaf.y;values[2]=leaf.radius;}
@@ -165,7 +170,7 @@ function updateVisuals(){
  for(const p of pollen){const x=((p.x+sim.time*(1.6+w.windX*6))%WORLD.width+WORLD.width)%WORLD.width,y=p.y+Math.sin(sim.time*.18+p.phase)*7+Math.sin(sim.time*.07+p.phase)*w.windY*6;p.sprite.position.set(x,y);p.sprite.visible=isWater(x,y);}
 }
 app.ticker.maxFPS=wallpaper.fps;
-app.ticker.add(t=>{const start=performance.now();frames++;const date=new Date();updateSky(date);growth.step(date.getTime());const dt=Math.min(t.deltaMS/1000,1/20);weather.step(dt,date,sky.daylight);if(!paused){climate.step(dt,weather.current,weather.source);sim.step(dt,weather.current);}updateVisuals();if(!paused)budget.record(start,performance.now()-start,app.ticker.maxFPS);if(budget.changed){budget.changed=false;fit();}});
+app.ticker.add(t=>{const start=performance.now();frames++;const date=new Date();updateSky(date);growth.step(date.getTime());const dt=Math.min(t.deltaMS/1000,1/20);weather.step(dt,date,sky.daylight);if(!paused){const w=weather.forScene();climate.step(dt,w,weather.source);sim.step(dt,w);}updateVisuals();if(!paused)budget.record(start,performance.now()-start,app.ticker.maxFPS);if(budget.changed){budget.changed=false;fit();}});
 function syncPlayback(){budget.resetClock();if(document.hidden||wallpaper.hostPaused)app.ticker.stop();else app.ticker.start();}
 document.addEventListener('visibilitychange',syncPlayback);
 window.addEventListener('pagehide',()=>growth.persist(true));
@@ -204,9 +209,9 @@ window.addEventListener('keydown',e=>{if(wallpaper.enabled||e.target.closest('in
 wallpaper.attach({
  apply(changed){
    if(changed.style)appearance.select(changed.style);
-   if(changed.weather)weatherUI.setDemo(changed.weather);
-   if(changed.time)weatherUI.setTime(changed.time);
    if(changed.season)seasons.select(changed.season);
+   if(changed.weather||changed.season)weatherUI.setDemo(changed.weather||wallpaper.options.weather);
+   if(changed.time)weatherUI.setTime(changed.time);
    if(changed.fit)fit();
    if(changed.fps){app.ticker.maxFPS=paused?20:wallpaper.fps;budget.resetClock();}
    if(changed.interaction===false)cancelGesture();

@@ -59,7 +59,7 @@ export function precipitationFrame(time,weather,plants=[],frame=null,climate=nul
       }
     }
   }
-  const snowCount=Math.floor(Math.max(0,Math.min(1,weather.snow))*SNOW_PARTICLE_LIMIT*quality);
+  const snowCount=season==='winter'?Math.floor(Math.max(0,Math.min(1,weather.snow))*SNOW_PARTICLE_LIMIT*quality):0;
   if(frame)frame.snowCount=snowCount;
   for(let i=0;i<snowCount;i++) {
     const p=snowParticle(PRECIPITATION_PARTICLES[i],time,weather,frame?.snowPool[i]);

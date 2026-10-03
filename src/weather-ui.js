@@ -37,7 +37,11 @@ export function setupWeatherUI(weather, growth) {
   const setSearching = (busy) => cityForm.setAttribute('aria-busy', String(busy));
   const updateSummary = () => {
     summary.textContent = `${weather.target.label} · ${weather.source === 'live' ? '当地天气' : '演示'}`;
-    buttons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.weather === weather.preset)));
+    buttons.forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.weather === weather.preset));
+      button.disabled = button.dataset.weather === 'snow' && weather.season !== 'winter';
+      if(button.disabled)button.title='降雪仅在冬季可用';else button.removeAttribute('title');
+    });
   };
   function cancel() {
     token++;
@@ -49,6 +53,7 @@ export function setupWeatherUI(weather, growth) {
     local.disabled = false;
   }
   function demo(name) {
+    if(weather.setPreset(name)===false)return;
     cancel();
     activeLocation = null;
     displayedLocation = null;
@@ -56,7 +61,6 @@ export function setupWeatherUI(weather, growth) {
     credit.hidden = true;
     weatherAttributions = [];
     lookupAttributions = [];
-    weather.setPreset(name);
     setStatus('演示天气 · 未获取位置或真实天气');
     updateSummary();
   }
