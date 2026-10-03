@@ -71,7 +71,7 @@
       },
       "pondseason": {
         "order": 3,
-        "text": "树木季节",
+        "text": "场景季节",
         "type": "combo",
         "value": "auto",
         "options": [
