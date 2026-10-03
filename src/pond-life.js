@@ -20,8 +20,7 @@ export class PondLife {
     this.bottom=new Container();world.addChildAt(this.bottom,1);
     this.frogLayer=new Container();aboveWater.addChildAt(this.frogLayer,0);
     this.rings=new Graphics();world.addChild(this.rings);
-    const size=atlas.width/2;
-    this.textures=Array.from({length:4},(_,i)=>new Texture({source:atlas.source,frame:new Rectangle(i%2*size,Math.floor(i/2)*size,size,size)}));
+    this.textureSets=new Map();this.setStyle(atlas);
     this.crabs=Array.from({length:4},(_,id)=>{
       const rock=ROCKS[id],homeX=rock[0]+rock[2]+11,homeY=rock[1]+12,mesh=crabMesh(this.textures[id%2],31+this.random()*9);
       mesh.tint=0xbed0b7;this.bottom.addChild(mesh);
@@ -35,6 +34,17 @@ export class PondLife {
       return {id,group,shadow,poses,x:perch[0],y:perch[1],startX:perch[0],startY:perch[1],targetX:perch[0],targetY:perch[1],perch:null,heading:this.random()*TAU,state:'rest',until:3+this.random()*5,elapsed:0,duration:.5,height:0,alpha:1,phase:this.random()*TAU,landing:'leaf',jumpCount:0,waterExitCount:0,lastJumpDistance:0};
     });
     this.splashes=Array.from({length:6},()=>({x:0,y:0,born:-100}));this.splashIndex=0;
+  }
+  setStyle(atlas){
+    if(!this.textureSets.has(atlas)){
+      const w=atlas.width/2,h=atlas.height/2;
+      this.textureSets.set(atlas,Array.from({length:4},(_,i)=>new Texture({source:atlas.source,frame:new Rectangle(i%2*w,Math.floor(i/2)*h,w,h)})));
+    }
+    this.textures=this.textureSets.get(atlas);
+    for(const crab of this.crabs||[])crab.mesh.texture=this.textures[crab.id%2];
+    for(const frog of this.frogs||[])for(let i=0;i<2;i++){
+      const sprite=frog.poses[i];sprite.texture=this.textures[2+i];sprite.width=sprite.height=35+frog.id*2;
+    }
   }
   crabTarget(crab,time) {
     for(let attempt=0;attempt<24;attempt++) {

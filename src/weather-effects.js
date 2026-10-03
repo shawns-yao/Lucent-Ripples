@@ -58,9 +58,19 @@ export class WeatherEffects {
 export class LotusVisuals {
   constructor(world, atlas, growth){
     this.container=new Container();world.addChild(this.container);this.growth=growth;
-    const cellW=atlas.width/3,cellH=atlas.height/2;
-    this.textures=Array.from({length:6},(_,i)=>new Texture({source:atlas.source,frame:new Rectangle(i%3*cellW,Math.floor(i/3)*cellH,cellW,cellH)}));
+    this.textureSets=new Map();this.setStyle(atlas);
     this.plants=growth.plants.map(p=>{const group=new Container();group.position.set(p.x,p.y);this.container.addChild(group);const leaves=new Container();const flower=new Container();group.addChild(leaves,flower);const leafSprites=Array.from({length:3},(_,i)=>{const s=new Sprite(this.textures[i]);s.anchor.set(.5);leaves.addChild(s);return s;});const blooms=Array.from({length:3},(_,i)=>{const s=new Sprite(this.textures[3+i]);s.anchor.set(.5);flower.addChild(s);return s;});return{group,leaves,flower,leafSprites,blooms};});
+  }
+  setStyle(atlas){
+    if(!this.textureSets.has(atlas)){
+      const cellW=atlas.width/3,cellH=atlas.height/2;
+      this.textureSets.set(atlas,Array.from({length:6},(_,i)=>new Texture({source:atlas.source,frame:new Rectangle(i%3*cellW,Math.floor(i/3)*cellH,cellW,cellH)})));
+    }
+    this.textures=this.textureSets.get(atlas);
+    for(const plant of this.plants||[]){
+      plant.leafSprites.forEach((sprite,i)=>sprite.texture=this.textures[i]);
+      plant.blooms.forEach((sprite,i)=>sprite.texture=this.textures[3+i]);
+    }
   }
   update(time,weather){
     this.growth.plants.forEach((p,i)=>{const v=this.plants[i],{visible,leafScale:size,leafStage,bloomStage,bloomScale}=lotusAppearance(p.age);v.group.visible=visible;

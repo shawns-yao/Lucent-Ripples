@@ -31,7 +31,7 @@ const FRAMES = [
  * Add to an above-water container: this module owns its day/night color grade.
  */
 export class ShoreLife {
-  constructor(world, atlas, winterAtlas) {
+  constructor(world, atlas, winterAtlas, layout = {}) {
     if (!world?.addChild || !atlas?.source) {
       throw new TypeError('ShoreLife requires a Pixi container and an atlas texture');
     }
@@ -49,19 +49,16 @@ export class ShoreLife {
     this.container.addChild(this.shadowLayer, this.treeLayer, this.insectLayer, this.fireflyLayer);
     world.addChild(this.container);
 
-    const sourceScaleX = atlas.width / 1254;
-    const sourceScaleY = atlas.height / 1254;
-    this.textures = FRAMES.map(([x, y, width, height]) => new Texture({
-      source: atlas.source,
-      frame: new Rectangle(x * sourceScaleX, y * sourceScaleY, width * sourceScaleX, height * sourceScaleY),
-    }));
-    const winterFrames=[[75,115,545,540],[707,128,517,531]];
-    this.winterTextures=winterFrames.map(([x,y,width,height])=>new Texture({source:winterAtlas.source,frame:new Rectangle(x*winterAtlas.width/1254,y*winterAtlas.height/1254,width*winterAtlas.width/1254,height*winterAtlas.height/1254)}));
+    this.textureSets = new Map();
+    const set = this.textureSet(atlas, winterAtlas, layout);
+    this.textures = set.textures; this.winterTextures = set.winterTextures;
+    this.butterflyTextures = set.butterflyTextures; this.layout = set.layout;
     this.trees = [
       this.makeTree(this.textures[0], 306, 282 / 506, 442 / 490),
       this.makeTree(this.textures[1], 250, 234 / 468, 429 / 460),
     ];
-    for(let i=0;i<2;i++){const tree=this.trees[i],sprite=new Sprite(this.winterTextures[i]);sprite.anchor.copyFrom(tree.sprite.anchor);sprite.width=tree.width;sprite.scale.y=sprite.scale.x;sprite.alpha=0;tree.group.addChild(sprite);tree.winterSprite=sprite;}
+    for(let i=0;i<2;i++){const tree=this.trees[i],sprite=new Sprite(this.winterTextures[i]);sprite.anchor.copyFrom(tree.sprite.anchor);sprite.width=tree.width;sprite.height=tree.height;sprite.alpha=0;tree.group.addChild(sprite);tree.winterSprite=sprite;}
+    this.setStyle(atlas,winterAtlas,layout);
 
     // A private generator means scenery never changes the fish simulation seed.
     const random = rng(84627);
@@ -98,10 +95,39 @@ export class ShoreLife {
     const group = new Container();
     const sprite = new Sprite(texture);
     sprite.anchor.set(anchorX, anchorY);
-    sprite.scale.set(width / texture.width);
+    const height=width*(width===306?490/506:460/468);
+    sprite.width=width;sprite.height=height;
     group.addChild(sprite);
     this.treeLayer.addChild(group);
-    return { group, sprite, width };
+    return { group, sprite, width, height };
+  }
+
+  textureSet(atlas, winterAtlas, layout) {
+    if(this.textureSets.has(atlas))return this.textureSets.get(atlas);
+    const frames=(source,rects)=>rects.map(([x,y,w,h])=>new Texture({source:source.source,frame:new Rectangle(x*source.width/1254,y*source.height/1254,w*source.width/1254,h*source.height/1254)}));
+    const textures=frames(atlas,layout.frames||FRAMES);
+    const winterTextures=frames(winterAtlas,layout.winterFrames||[[75,115,545,540],[707,128,517,531]]);
+    const f=textures[3].frame;
+    const piece=(x,width)=>new Texture({source:atlas.source,frame:new Rectangle(f.x+x,f.y,width,f.height)});
+    const butterflyTextures=[piece(0,f.width*.44),piece(f.width*.56,f.width*.44),piece(f.width*.44,f.width*.12)];
+    const set={textures,winterTextures,butterflyTextures,layout:{...layout,sourceScaleX:atlas.width/1254,sourceScaleY:atlas.height/1254}};
+    this.textureSets.set(atlas,set);return set;
+  }
+
+  setStyle(atlas,winterAtlas,layout={}) {
+    const set=this.textureSet(atlas,winterAtlas,layout);
+    this.textures=set.textures;this.winterTextures=set.winterTextures;this.butterflyTextures=set.butterflyTextures;this.layout=set.layout;
+    const anchors=layout.anchors||[[282/506,442/490],[234/468,429/460]];
+    for(let i=0;i<2;i++){
+      const tree=this.trees[i];tree.sprite.texture=this.textures[i];tree.winterSprite.texture=this.winterTextures[i];
+      tree.sprite.anchor.set(...anchors[i]);tree.winterSprite.anchor.copyFrom(tree.sprite.anchor);
+      tree.sprite.width=tree.winterSprite.width=tree.width;tree.sprite.height=tree.winterSprite.height=tree.height;
+    }
+    for(const bee of this.bees||[])bee.sprite.texture=this.textures[2];
+    for(const b of this.butterflies||[]){
+      const [left,right]=b.sprite.wings;left.texture=this.butterflyTextures[0];right.texture=this.butterflyTextures[1];b.sprite.body.texture=this.butterflyTextures[2];
+      left.x=-this.textures[3].width*.06;right.x=this.textures[3].width*.06;
+    }
   }
 
   makeInsect(texture) {
@@ -113,10 +139,9 @@ export class ShoreLife {
 
   makeButterfly(texture) {
     const group=new Container(),f=texture.frame;
-    const piece=(x,width)=>new Sprite(new Texture({source:texture.source,frame:new Rectangle(f.x+x,f.y,width,f.height)}));
-    const left=piece(0,f.width*.44),right=piece(f.width*.56,f.width*.44),body=piece(f.width*.44,f.width*.12);
+    const [left,right,body]=this.butterflyTextures.map(part=>new Sprite(part));
     left.anchor.set(1,.5);right.anchor.set(0,.5);body.anchor.set(.5);
-    left.x=-f.width*.06;right.x=f.width*.06;group.addChild(left,right,body);group.wings=[left,right];
+    left.x=-f.width*.06;right.x=f.width*.06;group.addChild(left,right,body);group.wings=[left,right];group.body=body;
     this.insectLayer.addChild(group);return group;
   }
 
@@ -175,8 +200,7 @@ export class ShoreLife {
 
     const left = this.trees[0];
     const right = this.trees[1];
-    // Keep the bank canopy and hive at the visible shore when cover scaling crops
-    // a narrow screen; do not let the hive disappear outside the camera.
+    // Bank trees stay at their world positions as the viewport pans.
     const view = this.viewport || { left: 0, right: width, top: 0, bottom: height };
     left.group.position.set(Math.max(width * .052, view.left - 10), Math.max(height * .225, view.top + 90));
     right.group.position.set(Math.min(width * .941, view.right + 10), Math.max(height * .256, view.top + 90));
@@ -185,19 +209,19 @@ export class ShoreLife {
       const sway = Math.sin(time * .51 + i * 2.1) * .66 + Math.sin(time * .97 + i) * .34;
       tree.group.rotation = sway * (.003 + wind * .0012);
       tree.group.skew.x = Math.sin(time * .39 + i) * wind * .0007;
-      tree.sprite.scale.y = tree.sprite.scale.x * (1 + Math.sin(time * .64 + i * 1.7) * .0025);
+      tree.sprite.scale.y = tree.height/tree.sprite.texture.height * (1 + Math.sin(time * .64 + i * 1.7) * .0025);
       tree.sprite.tint = foliageTint;
       const winter=clamp(this.winterAmount||0);tree.sprite.alpha=1-winter;tree.winterSprite.alpha=winter;
       tree.winterSprite.visible=winter>.001;tree.sprite.visible=winter<.999;
       const base=tree.width/tree.winterSprite.texture.width;
-      tree.winterSprite.scale.set(base,base*(1+Math.sin(time*.64+i*1.7)*.0025));
+      tree.winterSprite.scale.set(base,tree.height/tree.winterSprite.texture.height*(1+Math.sin(time*.64+i*1.7)*.0025));
       tree.winterSprite.tint=mixColor(0x5d7383,0xe9f0e9,illumination);
     }
 
-    // The left frame's hive is at about (460,551) in the original atlas.
-    // Rotate its offset with the trunk pivot so departures follow the swaying hive.
-    const offsetX = (366 - 282) * left.sprite.scale.x;
-    const offsetY = (414 - 442) * left.sprite.scale.y;
+    // Departures follow the atlas-specific hive, rotated around the trunk pivot.
+    const frame=left.sprite.texture.frame,[hiveX,hiveY]=this.layout.hive||[460,551];
+    const offsetX = (hiveX*this.layout.sourceScaleX-frame.x-frame.width*left.sprite.anchor.x)*left.sprite.scale.x;
+    const offsetY = (hiveY*this.layout.sourceScaleY-frame.y-frame.height*left.sprite.anchor.y)*left.sprite.scale.y;
     const c = Math.cos(left.group.rotation), s = Math.sin(left.group.rotation);
     this.hive.x = left.group.x + offsetX * c - offsetY * s;
     this.hive.y = left.group.y + offsetX * s + offsetY * c;
@@ -256,7 +280,7 @@ export class ShoreLife {
     for(const tree of this.trees) {
       const dx=x-tree.group.x,dy=y-tree.group.y,c=Math.cos(tree.group.rotation),s=Math.sin(tree.group.rotation);
       const localX=dx*c+dy*s,localY=-dx*s+dy*c;
-      const width=tree.width,height=tree.width*tree.sprite.texture.height/tree.sprite.texture.width;
+      const width=tree.width,height=tree.height;
       const cx=(.5-tree.sprite.anchor.x)*width,cy=(.5-tree.sprite.anchor.y)*height;
       if(((localX-cx)/(width*.48+clearance))**2+((localY-cy)/(height*.44+clearance))**2<1)return true;
     }
@@ -266,7 +290,6 @@ export class ShoreLife {
   destroy() {
     this.container.destroy({ children: true });
     // Frames share the caller-owned atlas source; never destroy that source.
-    for (const texture of this.textures) texture.destroy(false);
-    for (const texture of this.winterTextures) texture.destroy(false);
+    for(const set of this.textureSets.values())for(const texture of [...set.textures,...set.winterTextures,...set.butterflyTextures])texture.destroy(false);
   }
 }

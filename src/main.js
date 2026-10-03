@@ -9,6 +9,7 @@ import { STATIC_PADS, isWater } from './pond-surface.js';
 import { PondClimate } from './pond-climate.js';
 import { PondLife } from './pond-life.js';
 import { FrameBudget } from './frame-budget.js';
+import { savedSceneStyle, loadSceneStyle, setupSceneStyle } from './scene-style.js';
 import { LOTUS_STORAGE_KEY } from './lotus-growth.js';
 import { celestialAt } from './celestial.js';
 import './style.css';
@@ -25,13 +26,13 @@ await app.init({resizeTo:window,preference:'webgl',antialias:true,resolution:ren
 host.appendChild(app.canvas);
 app.canvas.setAttribute('aria-label','水光粼粼的池塘，44 条锦鲤自由游动。点击水面投下涟漪，吸引附近的鱼');
 app.canvas.tabIndex=0;
-const [bottom,atlas,lotusAtlas,shoreAtlas,lifeAtlas,moonTexture,winterAtlas]=await Promise.all([Assets.load('/assets/pond-bottom.png'),Assets.load('/assets/koi-atlas.png'),Assets.load('/assets/lotus-growth.png'),Assets.load('/assets/shore-life.png'),Assets.load('/assets/pond-life.png'),Assets.load('/assets/moon-reference.png'),Assets.load('/assets/shore-winter.png')]);
+const [initialStyle,moonTexture]=await Promise.all([loadSceneStyle(savedSceneStyle()),Assets.load('/assets/moon-reference.png')]);
+const bottom=initialStyle.bottom;
 const world=new Container();app.stage.addChild(world);
 const bg=new Sprite(bottom);bg.width=WORLD.width;bg.height=WORLD.height;world.addChild(bg);
 const shadows=new Container();shadows.filters=[new BlurFilter({strength:1.5,quality:1,resolution:.5})];world.addChild(shadows);
 const fishes=new Container();world.addChild(fishes);
-const framesData=[[13,18,743,324],[789,19,732,325],[13,355,740,315],[785,358,735,315],[14,684,742,321],[788,687,733,320]];
-const textures=framesData.map(([x,y,width,height])=>new Texture({source:atlas.source,frame:new Rectangle(x,y,width,height)}));
+const textures=initialStyle.fishTextures;
 const COLS=20,ROWS=4;
 const tailWeights=Array.from({length:COLS+1},(_,x)=>Math.pow(1-x/COLS,2.2));
 const turnWeights=Array.from({length:COLS+1},(_,x)=>Math.pow(1-x/COLS,1.8));
@@ -55,15 +56,28 @@ const pads=new Sprite(bottom);pads.width=WORLD.width;pads.height=WORLD.height;
 const padMask=new Graphics();
 for(const [x,y,rx,ry] of STATIC_PADS)padMask.ellipse(x,y,rx,ry).fill(0xffffff);
 world.addChild(pads,padMask);pads.mask=padMask;
-const lotus=new LotusVisuals(world,lotusAtlas,growth);
+const lotus=new LotusVisuals(world,initialStyle.lotus,growth);
 const water=createWaterFilter(climate.texture,moonTexture);world.filters=[water];world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
 // Tiny bits of drifting pollen lend depth without turning the water into a particle effect.
 const motes=new Container();world.addChild(motes);
 const shoreWorld=new Container();app.stage.addChild(shoreWorld);
-const shore=new ShoreLife(shoreWorld,shoreAtlas,winterAtlas);
-const life=new PondLife(world,shoreWorld,lifeAtlas,climate,(x,y)=>shore.canopyAt(x,y));
+const shore=new ShoreLife(shoreWorld,initialStyle.shore,initialStyle.winter,initialStyle.layout);
+const life=new PondLife(world,shoreWorld,initialStyle.life,climate,(x,y)=>shore.canopyAt(x,y));
 const atmosphere=new WeatherEffects(app.stage,climate);
 const weatherUI=setupWeatherUI(weather,growth);
+function applySceneStyle(style){
+ bg.texture=style.bottom;pads.texture=style.bottom;
+ bg.width=pads.width=WORLD.width;bg.height=pads.height=WORLD.height;
+ for(let i=0;i<visuals.length;i++){
+   const {mesh,shadow}=visuals[i];mesh.texture=shadow.texture=style.fishTextures[sim.fish[i].variant];
+   mesh.tint=style.key==='cartoon'?0xffffff:0xe4ede0;
+ }
+ shore.setStyle(style.shore,style.winter,style.layout);
+ lotus.setStyle(style.lotus);life.setStyle(style.life);
+ water.resources.waterUniforms.uniforms.uStyle=style.key==='cartoon'?1:0;
+}
+applySceneStyle(initialStyle);
+const appearance=setupSceneStyle(initialStyle,applySceneStyle);
 const pollen=Array.from({length:27},()=>{
  const sprite=new Sprite(Texture.WHITE);sprite.tint=0xece9be;sprite.alpha=.15;const size=.5+sim.random()*.8;sprite.width=sprite.height=size; motes.addChild(sprite);
  return {sprite,x:sim.random()*WORLD.width,y:sim.random()*WORLD.height,phase:sim.random()*6.28};
@@ -182,4 +196,5 @@ updateVisuals();ready=true;document.querySelector('#loading').classList.add('don
 // Small deterministic observation API for verification and reproducible captures.
 window.__pond={get ready(){return ready},get renderer(){return app.renderer.name},get paused(){return paused},get frames(){return frames},get lastClick(){return lastClick},snapshot:()=>sim.snapshot(),weather:()=>({source:weather.source,preset:weather.preset,current:{...weather.current},target:{...weather.target},timeMode:weather.timeMode}),growth:()=>growth.snapshot(),sky:()=>structuredClone(sky),climate:()=>climate.snapshot(),wildlife:()=>life.snapshot(),butterflies:()=>shore.butterflies.map(b=>({x:b.x,y:b.y,state:b.state,height:b.height,visible:b.sprite.visible})),precipitation:()=>({rain:structuredClone(atmosphere.frame.rain),impacts:structuredClone(atmosphere.frame.impacts),snow:structuredClone(atmosphere.frame.snow),shaderImpacts:structuredClone(atmosphere.frame.shaderImpacts)}),performance:()=>({...budget.snapshot(),resolution:app.renderer.resolution,drawPixels:app.canvas.width*app.canvas.height}),viewport:()=>({x:world.x,y:world.y,width:WORLD.width*world.scale.x,height:WORLD.height*world.scale.y,scaleX:world.scale.x,scaleY:world.scale.y,windowWidth:innerWidth,windowHeight:innerHeight}),waterAt:(x,y)=>isWater(x,y),surfaceAt:(x,y)=>climate.surfaceAt(x,y)};
 window.__pond.shoreLife=()=>shore.snapshot();
+window.__pond.appearance=()=>appearance.snapshot();
 if(params.has('still')){paused=true;document.querySelector('#hint').classList.add('quiet');}

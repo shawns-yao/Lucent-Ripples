@@ -22,6 +22,7 @@ uniform mediump vec4 uInputSize;
 uniform vec4 uInputClamp;
 uniform mediump vec4 uOutputFrame;
 uniform float uTime;
+uniform float uStyle;
 uniform vec2 uWorld;
 uniform vec2 uOrigin;
 uniform vec4 uClimate; // ice, settled snow, rendering quality, temperature
@@ -117,11 +118,14 @@ void main() {
   vec2 w=localWorld/192.;
   w+=vec2(sin(w.y*2.2+t*.19)+sin(w.x*1.6-w.y+t*.11),cos(w.x*2.1-t*.15)+sin(w.y*1.7+w.x-t*.13))*.36;
   w+=vec2(sin(w.y*4.7-t*.21),cos(w.x*4.2+t*.17))*.09;
-  float line=cells(w,t);
-  float caustic=exp(-line*42.0)*.076;
-  float broad=exp(-line*14.0)*.026;
+  float caustic=0.,broad=0.;
+  if(uStyle<.5){
+    float line=cells(w,t);
+    caustic=exp(-line*42.0)*.056;
+    broad=exp(-line*14.0)*.018;
+  }
   float curved=sin(localWorld.x*.017+localWorld.y*.009+sin(localWorld.y*.022-t*.18)*1.9+t*.24);
-  float ribbon=exp(-abs(curved)*54.)*noise(localWorld*.008+vec2(t*.015,0.))*.025;
+  float ribbon=exp(-abs(curved)*mix(54.,32.,uStyle))*noise(localWorld*.008+vec2(t*.015,0.))*mix(.025,.014,uStyle);
   float modulation=.45+.55*(.5+.5*sin(world.x*.005+world.y*.007-t*.45));
   color.rgb+=vec3(.73,.91,.64)*((caustic+broad)*modulation+ribbon)*(1.-uWeather.x*.85)*uWeather.y*movement;
   color.rgb+=vec3(.77,.89,.77)*rp.z*movement;
@@ -139,7 +143,7 @@ void main() {
   float spot=exp(-dot(point*vec2(1.,1.8),point*vec2(1.,1.8))*125.);
   float flicker=pow(max(0.,sin(t*(1.1+h.x)+h.y*60.)),8.);
   float sunshine=uSun.z*uWeather.y;
-  color.rgb+=vec3(1.,.95,.72)*spot*flicker*(.12+sunPool*.85)*sunshine*movement;
+  color.rgb+=vec3(1.,.95,.72)*spot*flicker*(.12+sunPool*.85)*sunshine*movement*mix(1.,.55,uStyle);
   // A broken specular footprint, not a sharp lunar photograph on the water.
   vec2 moon=world-uMoon.xy;
   moon.x+=sin(world.y*.046+t*.31)*(3.+uWeather.z*5.)+flow.x*2.;
@@ -167,7 +171,7 @@ void main() {
   finalColor=vec4(color.rgb,color.a);
 }`;
 export function createWaterFilter(terrain,moonTexture) {
- const uniforms={uTime:{value:0,type:'f32'},uWorld:{value:[1672,941],type:'vec2<f32>'},uOrigin:{value:[0,0],type:'vec2<f32>'},uClimate:{value:[0,0,1,20],type:'vec4<f32>'},uWeather:{value:[.08,1,.1,0],type:'vec4<f32>'},uWind:{value:[0,0],type:'vec2<f32>'},uMoon:{value:[1000,280,0,1],type:'vec4<f32>'},uSun:{value:[835,350,1,.5],type:'vec4<f32>'}};
+ const uniforms={uTime:{value:0,type:'f32'},uStyle:{value:0,type:'f32'},uWorld:{value:[1672,941],type:'vec2<f32>'},uOrigin:{value:[0,0],type:'vec2<f32>'},uClimate:{value:[0,0,1,20],type:'vec4<f32>'},uWeather:{value:[.08,1,.1,0],type:'vec4<f32>'},uWind:{value:[0,0],type:'vec2<f32>'},uMoon:{value:[1000,280,0,1],type:'vec4<f32>'},uSun:{value:[835,350,1,.5],type:'vec4<f32>'}};
  for(let i=0;i<8;i++)uniforms['uLeaf'+i]={value:[0,0,0,0],type:'vec4<f32>'};
  for(let i=0;i<5;i++) uniforms['uRipple'+i]={value:[0,0,-100,0],type:'vec4<f32>'};
  for(let i=0;i<16;i++) uniforms['uRainImpact'+i]={value:[0,0,-100,0],type:'vec4<f32>'};
