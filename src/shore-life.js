@@ -1,6 +1,7 @@
 import { Container, Sprite, Texture, Rectangle, Graphics } from 'pixi.js';
 import { rng, WORLD } from './simulation.js';
 import { STATIC_PADS, SHORE } from './pond-surface.js';
+import { createFoliageFilter, setFoliageSeason } from './tree-seasons.js';
 
 const TAU = Math.PI * 2;
 const clamp = (value, low = 0, high = 1) => Math.max(low, Math.min(high, value));
@@ -59,6 +60,8 @@ export class ShoreLife {
     ];
     for(let i=0;i<2;i++){const tree=this.trees[i],sprite=new Sprite(this.winterTextures[i]);sprite.anchor.copyFrom(tree.sprite.anchor);sprite.width=tree.width;sprite.height=tree.height;sprite.alpha=0;tree.group.addChild(sprite);tree.winterSprite=sprite;}
     this.setStyle(atlas,winterAtlas,layout);
+    this.foliageFilter=createFoliageFilter();this.season='summer';
+    for(const tree of this.trees)tree.sprite.filters=[this.foliageFilter];
 
     // A private generator means scenery never changes the fish simulation seed.
     const random = rng(84627);
@@ -189,7 +192,7 @@ export class ShoreLife {
     const snow = clamp(finite(weather.snow, 0));
     const cloud = clamp(finite(weather.cloud, 0));
     const calm = clamp(1 - rain * 1.35 - snow * 1.6) * clamp(1 - (wind - 5) / 12);
-    const cold=weather.temp<6||(this.winterAmount||0)>.1;
+    const cold=this.season==='winter'||weather.temp<6||(this.winterAmount||0)>.1;
     const day = cold?0:clamp((light - .22) / .52) * calm;
     const night = cold?0:clamp((.43 - light) / .29) * clamp(1 - rain * 1.3 - snow * 1.5);
     this.activity.day = day;
@@ -197,6 +200,7 @@ export class ShoreLife {
     const illumination = clamp((light - .08) / .92) * (1 - cloud * .14);
     const foliageTint = mixColor(mixColor(0x40556b, 0xfff7e4, illumination),0xd3ded9,clamp(this.snowCover||0)*.65);
     const insectTint = mixColor(0x8196ac, 0xfffbe9, illumination);
+    if(this.appliedSeason!==this.season){setFoliageSeason(this.foliageFilter,this.season);this.appliedSeason=this.season;}
 
     const left = this.trees[0];
     const right = this.trees[1];
@@ -211,7 +215,7 @@ export class ShoreLife {
       tree.group.skew.x = Math.sin(time * .39 + i) * wind * .0007;
       tree.sprite.scale.y = tree.height/tree.sprite.texture.height * (1 + Math.sin(time * .64 + i * 1.7) * .0025);
       tree.sprite.tint = foliageTint;
-      const winter=clamp(this.winterAmount||0);tree.sprite.alpha=1-winter;tree.winterSprite.alpha=winter;
+      const winter=this.season==='winter'?1:clamp(this.winterAmount||0);tree.sprite.alpha=1-winter;tree.winterSprite.alpha=winter;
       tree.winterSprite.visible=winter>.001;tree.sprite.visible=winter<.999;
       const base=tree.width/tree.winterSprite.texture.width;
       tree.winterSprite.scale.set(base,tree.height/tree.winterSprite.texture.height*(1+Math.sin(time*.64+i*1.7)*.0025));
@@ -274,7 +278,7 @@ export class ShoreLife {
     return this.activity;
   }
 
-  snapshot(){return {beesVisible:this.bees.filter(b=>b.sprite.visible).length,butterfliesVisible:this.butterflies.filter(b=>b.sprite.visible).length,firefliesVisible:this.fireflyLayer.visible?this.fireflies.filter(f=>f.sprite.alpha>.01).length:0,winterTrees:this.trees.map(t=>t.winterSprite.alpha),winterAmount:this.winterAmount||0};}
+  snapshot(){return {season:this.season,beesVisible:this.bees.filter(b=>b.sprite.visible).length,butterfliesVisible:this.butterflies.filter(b=>b.sprite.visible).length,firefliesVisible:this.fireflyLayer.visible?this.fireflies.filter(f=>f.sprite.alpha>.01).length:0,winterTrees:this.trees.map(t=>t.winterSprite.alpha),winterAmount:this.winterAmount||0};}
 
   canopyAt(x,y,clearance=18) {
     for(const tree of this.trees) {
@@ -289,6 +293,7 @@ export class ShoreLife {
 
   destroy() {
     this.container.destroy({ children: true });
+    this.foliageFilter.destroy();
     // Frames share the caller-owned atlas source; never destroy that source.
     for(const set of this.textureSets.values())for(const texture of [...set.textures,...set.winterTextures,...set.butterflyTextures])texture.destroy(false);
   }

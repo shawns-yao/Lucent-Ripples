@@ -12,6 +12,7 @@ void main() {
   gl_Position=vec4(p,0.0,1.0);
   vTextureCoord=aPosition*(uOutputFrame.zw*uInputSize.zw);
 }`;
+export const filterVertex=vertex;
 const fragment = `
 in vec2 vTextureCoord;
 out vec4 finalColor;

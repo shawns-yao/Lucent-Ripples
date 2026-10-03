@@ -151,9 +151,9 @@ export class PondLife {
       }
     }
     for(const f of this.frogs) {
-      const active=this.climate.winter||weather.temp<6?0:warm*(1-weather.snow);
+      const active=this.seasonWinter||this.climate.winter||weather.temp<6?0:warm*(1-weather.snow);
       f.alpha+=(active-f.alpha)*Math.min(1,dt*1.6);f.group.alpha=f.alpha*light;f.group.visible=f.group.alpha>.015;
-      f.group.visible=f.group.visible&&!this.climate.winter&&weather.temp>=6;
+      f.group.visible=f.group.visible&&!this.seasonWinter&&!this.climate.winter&&weather.temp>=6;
       if(active>.25||f.state==='jump'||f.state==='prepare') {
         if(active>.25&&f.state==='rest'&&time>=f.until)this.jump(f,time);
         if(f.state==='prepare'){f.elapsed+=dt;if(f.elapsed>=f.preparation){f.state='jump';f.elapsed=0;}}
