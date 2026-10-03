@@ -1,4 +1,5 @@
 import { Assets, Texture, Rectangle } from 'pixi.js';
+import { createSurfaceOcclusion } from './surface-occlusion.js';
 
 const STORAGE_KEY = 'pond-scene-style';
 const FISH_FRAMES = [[13,18,743,324],[789,19,732,325],[13,355,740,315],[785,358,735,315],[14,684,742,321],[788,687,733,320]];
@@ -36,6 +37,7 @@ export function loadSceneStyle(key) {
     const pending = Promise.all([profile.bottom,profile.fish,profile.shore,profile.winter,profile.lotus,profile.life].map(url => Assets.load({src:url,data:{autoGenerateMipmaps:true,minFilter:'linear',mipmapFilter:'linear'}})))
       .then(([bottom,atlas,shore,winter,lotus,life]) => ({
         key, bottom, shore, winter, lotus, life, layout: profile.layout,
+        surface: createSurfaceOcclusion(bottom,key),
         fishTextures: (key==='cartoon'?Array.from({length:6},(_,i)=>[i%2*768,Math.floor(i/2)*1024/3,768,1024/3]):FISH_FRAMES).map(([x,y,width,height]) => new Texture({
           source: atlas.source,
           frame: new Rectangle(x*atlas.width/1536,y*atlas.height/1024,width*atlas.width/1536,height*atlas.height/1024),

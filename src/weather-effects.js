@@ -59,7 +59,7 @@ export class LotusVisuals {
   constructor(world, atlas, growth){
     this.container=new Container();world.addChild(this.container);this.growth=growth;
     this.textureSets=new Map();this.setStyle(atlas);
-    this.plants=growth.plants.map(p=>{const group=new Container();group.position.set(p.x,p.y);this.container.addChild(group);const leaves=new Container();const flower=new Container();group.addChild(leaves,flower);const leafSprites=Array.from({length:3},(_,i)=>{const s=new Sprite(this.textures[i]);s.anchor.set(.5);leaves.addChild(s);return s;});const blooms=Array.from({length:3},(_,i)=>{const s=new Sprite(this.textures[3+i]);s.anchor.set(.5);flower.addChild(s);return s;});return{group,leaves,flower,leafSprites,blooms};});
+    this.plants=growth.plants.map(p=>{const group=new Container();group.position.set(p.x,p.y);this.container.addChild(group);const leaves=new Container();const flower=new Container();group.addChild(leaves,flower);const underlay=new Sprite(this.textures[0]);underlay.anchor.set(.5);leaves.addChild(underlay);const leafSprites=Array.from({length:3},(_,i)=>{const s=new Sprite(this.textures[i]);s.anchor.set(.5);leaves.addChild(s);return s;});const blooms=Array.from({length:3},(_,i)=>{const s=new Sprite(this.textures[3+i]);s.anchor.set(.5);flower.addChild(s);return s;});return{group,leaves,flower,underlay,leafSprites,blooms};});
   }
   setStyle(atlas){
     if(!this.textureSets.has(atlas)){
@@ -69,6 +69,7 @@ export class LotusVisuals {
     this.textures=this.textureSets.get(atlas);
     for(const plant of this.plants||[]){
       plant.leafSprites.forEach((sprite,i)=>sprite.texture=this.textures[i]);
+      plant.underlay.texture=this.textures[0];
       plant.blooms.forEach((sprite,i)=>sprite.texture=this.textures[3+i]);
     }
   }
@@ -76,6 +77,7 @@ export class LotusVisuals {
     this.growth.plants.forEach((p,i)=>{const v=this.plants[i],{visible,leafScale:size,leafStage,bloomStage,bloomScale}=lotusAppearance(p.age);v.group.visible=visible;
       v.group.x=p.x+Math.sin(time*.6+p.phase)*weather.wind*.26;v.group.y=p.y+Math.cos(time*.5+p.phase)*weather.wind*.15;
       v.leaves.rotation=Math.sin(time*.48+p.phase)*(.012+weather.wind*.003);v.leaves.scale.set((82/this.textures[0].width)*size);
+      v.underlay.texture=this.textures[Math.floor(leafStage)];
       v.leafSprites.forEach((s,n)=>{s.alpha=Math.max(0,1-Math.abs(leafStage-n));});
       v.flower.position.set(12,-14);v.flower.scale.set((49/this.textures[3].width)*bloomScale);v.flower.rotation=Math.sin(time*.7+p.phase)*weather.wind*.002;
       v.blooms.forEach((s,n)=>s.alpha=Math.max(0,1-Math.abs(bloomStage-n)));

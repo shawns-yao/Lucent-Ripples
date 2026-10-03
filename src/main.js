@@ -1,11 +1,11 @@
-import { Application, Assets, Container, Sprite, Texture, Rectangle, MeshSimple, Graphics, BlurFilter } from 'pixi.js';
+import { Application, Assets, Container, Sprite, Texture, Rectangle, MeshSimple, BlurFilter } from 'pixi.js';
 import { PondSimulation, WORLD } from './simulation.js';
 import { createWaterFilter } from './water.js';
 import { WeatherState, LotusGrowth } from './weather.js';
 import { WeatherEffects, LotusVisuals } from './weather-effects.js';
 import { setupWeatherUI } from './weather-ui.js';
 import { ShoreLife } from './shore-life.js';
-import { STATIC_PADS, ROCKS, isWater } from './pond-surface.js';
+import { isWater } from './pond-surface.js';
 import { PondClimate } from './pond-climate.js';
 import { PondLife } from './pond-life.js';
 import { FrameBudget } from './frame-budget.js';
@@ -52,12 +52,8 @@ const visuals=sim.fish.map(f=>{
  mesh.alpha=.87+f.depth*.1;mesh.tint=0xdfebd6;shadow.tint=0x183d35;shadow.alpha=.15;
  shadows.addChild(shadow);fishes.addChild(mesh);return {mesh,shadow};
 });
-// Surface leaves and rocks occlude submerged fish while retaining the background edges.
-const pads=new Sprite(bottom);pads.width=WORLD.width;pads.height=WORLD.height;
-const padMask=new Graphics();
-for(const [x,y,rx,ry] of STATIC_PADS)padMask.ellipse(x,y,rx,ry).fill(0xffffff);
-for(const [x,y,rx,ry] of ROCKS)padMask.ellipse(x,y,rx,ry).fill(0xffffff);
-world.addChild(pads,padMask);pads.mask=padMask;
+const pads=new Sprite(initialStyle.surface.texture);pads.width=WORLD.width;pads.height=WORLD.height;world.addChild(pads);
+let surfaceOcclusion=initialStyle.surface;
 const lotus=new LotusVisuals(world,initialStyle.lotus,growth);
 const water=createWaterFilter(climate.texture,moonTexture);world.filters=[water];world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
 // Tiny bits of drifting pollen lend depth without turning the water into a particle effect.
@@ -68,7 +64,7 @@ const life=new PondLife(world,shoreWorld,initialStyle.life,climate,(x,y)=>shore.
 const atmosphere=new WeatherEffects(app.stage,climate);
 const weatherUI=setupWeatherUI(weather,growth);
 function applySceneStyle(style){
- bg.texture=style.bottom;pads.texture=style.bottom;
+ bg.texture=style.bottom;pads.texture=style.surface.texture;surfaceOcclusion=style.surface;
  bg.width=pads.width=WORLD.width;bg.height=pads.height=WORLD.height;
  for(let i=0;i<visuals.length;i++){
    const {mesh,shadow}=visuals[i];mesh.texture=shadow.texture=style.fishTextures[sim.fish[i].variant];
@@ -206,4 +202,5 @@ window.__pond.shoreLife=()=>shore.snapshot();
 window.__pond.appearance=()=>appearance.snapshot();
 window.__pond.seasons=()=>seasons.snapshot();
 window.__pond.meshBudget=()=>({fishVertices:(COLS+1)*(ROWS+1),batchedFish:visuals.filter(v=>v.mesh.batched).length});
+window.__pond.occlusion=()=>({leafPixels:surfaceOcclusion.leafPixels,probes:[[405,522],[580,750],[192,198],[450,522],[879,864]].map(([x,y])=>({x,y,alpha:surfaceOcclusion.at(x,y)}))});
 if(params.has('still')){paused=true;document.querySelector('#hint').classList.add('quiet');}
