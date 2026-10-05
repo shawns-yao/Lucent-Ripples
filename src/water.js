@@ -165,22 +165,29 @@ void main() {
   float flicker=pow(max(0.,sin(t*(1.1+h.x)+h.y*60.)),8.);
   float sunshine=uSun.z*uWeather.y;
   color.rgb+=vec3(1.,.95,.72)*spot*flicker*(.025+sunPool*.72)*sunshine*movement*mix(1.,.55,uStyle);
-  // A broken specular footprint, not a sharp lunar photograph on the water.
+  // Curved, broken wave crests form a long specular path across the water.
   vec2 moon=world-uMoon.xy;
-  moon.x+=sin(world.y*.046+t*.31)*(3.+uWeather.z*5.)+flow.x*2.;
-  moon.y+=flow.y*1.2+rp.y;
+  moon.x+=sin(world.y*.042+t*1.3)*(2.+uWeather.z*4.)+flow.x*1.6;
+  moon.y+=flow.y+rp.y;
   float nightVisibility=uMoon.z*(1.-uWeather.y);
   float roughness=.35+uWeather.z*.8;
-  float width=17.+roughness*34.+max(0.,moon.y)*.10;
-  float path=exp(-pow(moon.x/width,2.)-pow((moon.y-35.)/(68.+roughness*62.),2.));
-  float wave=sin(world.y*.18+sin(world.x*.028+t*.27)*2.3+flow.x*.8-t*.65);
-  float fragments=pow(max(0.,wave),6.)*(.28+.72*noise(vec2(world.x*.11,world.y*.035)+vec2(t*.08,0.)));
-  vec2 moonUV=moon/vec2(58.,44.)+.5;
+  float width=25.+roughness*24.+max(0.,moon.y)*.045;
+  float path=exp(-pow(moon.x/width,2.)-pow((moon.y+12.)/(82.+roughness*22.),2.));
+  vec2 waveUV=world*vec2(.042,.065)+vec2(t*.13,-t*.28);
+  float waveNoise=noise(waveUV),fineWave=noise(waveUV*2.3+vec2(-t*.21,t*.08));
+  float crestPhase=moon.y*.20+sin(moon.x*.035+t*.7)*1.1+(waveNoise-.5)*2.8-t*1.5;
+  float crest=exp(-pow(sin(crestPhase),2.)*20.);
+  float secondary=exp(-pow(sin(moon.y*.33-moon.x*.025+fineWave*2.5+t*.9),2.)*32.);
+  float broken=smoothstep(.36,.74,waveNoise*.6+fineWave*.4);
+  float fragments=(crest+secondary*.28)*broken*broken*2.6;
+  float crestGlow=exp(-pow(sin(crestPhase),2.)*4.)*broken*.085;
+  vec2 moonUV=moon/vec2(48.,38.)+.5;
   float reference=texture(uMoonTexture,clamp(moonUV,0.,1.)).r;
-  float center=exp(-pow(moon.x/24.,2.)-pow(moon.y/17.,2.));
-  float halo=exp(-pow(moon.x/62.,2.)-pow(moon.y/105.,2.))*.028;
-  float moonLight=(path*fragments*.48+center*(.025+fragments*.20)*(.35+reference*.65)+halo)*uMoon.w*nightVisibility;
-  color.rgb+=vec3(.82,.89,.91)*moonLight*movement;
+  float center=exp(-pow(moon.x/18.,2.)-pow(moon.y/48.,2.));
+  float coreBreak=.28+.72*noise(moon*vec2(.06,.17)+vec2(t*.12,-t*.26));
+  float halo=exp(-pow(moon.x/58.,2.)-pow(moon.y/95.,2.))*.024;
+  float moonLight=(path*(fragments*1.45+crestGlow)+center*coreBreak*(.035+reference*.04)+halo)*uMoon.w*nightVisibility;
+  color.rgb+=vec3(.96,.97,.88)*moonLight*movement;
   // Sample solid ice once in world space: its fractures never drift with water.
   vec3 iceMaterial=texture(uIceTexture,clamp(localWorld/vec2(1672.,941.),0.,1.)).rgb;
   float crystal=smoothstep(.56,.86,dot(iceMaterial,vec3(.25,.6,.15)));

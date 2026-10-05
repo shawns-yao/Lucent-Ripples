@@ -148,7 +148,7 @@ export function celestialAt({date = new Date(), location = null, timeMode = 'aut
     mode:timeMode,
     isPreview,
     label:isPreview
-      ? timeMode === 'day' ? '白昼预览 · 固定示意太阳方位' : '夜景预览 · 满月示意（非当前月相）'
+      ? timeMode === 'day' ? '白昼预览 · 固定示意太阳方位' : '夜景预览 · 动态满月示意（非当前月相与真实轨迹）'
       : `${resolved.label} · 实时天体近似方位`,
     daylight:isPreview ? timeMode === 'day' ? 1 : .12 : .12 + .88 * smooth(-6 * RAD, 20 * RAD, sunPosition.altitude),
     transmission,

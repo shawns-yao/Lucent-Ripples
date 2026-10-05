@@ -200,8 +200,8 @@ function updateVisuals(updateAnimals=true){
  const precipitation=atmosphere.update(sim.time,w,view,growth.plants,budget.quality,seasons.selected());
  // Real sky directions map into this fixed north-up pond. An explicit preview
  // illustrates a visible moon inside the viewport, including narrow screens.
- const moonX=sky.isPreview?WORLD.width*.57:sky.moon.reflection.x*WORLD.width;
- const moonY=sky.isPreview?WORLD.height*.29:sky.moon.reflection.y*WORLD.height;
+ const moonX=sky.isPreview?WORLD.width*.54+Math.sin(sim.time/130)*125:sky.moon.reflection.x*WORLD.width;
+ const moonY=sky.isPreview?WORLD.height*.42+Math.sin(sim.time/170+.6)*42:sky.moon.reflection.y*WORLD.height;
  u.uMoon[0]=moonX;u.uMoon[1]=moonY;u.uMoon[2]=sky.moon.visibility;u.uMoon[3]=sky.moon.illumination;
  u.uSun[0]=sky.sun.reflection.x*WORLD.width;u.uSun[1]=sky.sun.reflection.y*WORLD.height;u.uSun[2]=sky.sun.visibility;u.uSun[3]=sky.moon.phase;
  for(let i=0;i<16;i++){const p=precipitation.shaderImpacts[i],values=u['uRainImpact'+i];values[0]=p?.x||0;values[1]=p?.y||0;values[2]=p?p.created:-100;values[3]=p?w.rain:0;}
@@ -293,6 +293,7 @@ window.__pond.appearance=()=>appearance.snapshot();
 window.__pond.seasons=()=>seasons.snapshot();
 window.__pond.seasonScene=()=>({season:shore.season,profile:{...seasonProfile(shore.season)},activeFish:sim.activeFish.length,visibleFish:visuals.filter(v=>v.mesh.visible).length,fish:sim.fish.map((f,i)=>({id:f.id,active:f.active,visible:visuals[i].mesh.visible,x:f.x,y:f.y,speed:f.speed,depth:f.submergence/Math.max(.01,f.waterDepth)})),leafRadii:climate.leaves.map(p=>p.radius)});
 window.__pond.mist=()=>({strength:water.resources.waterUniforms.uniforms.uMist,time:sim.time,sunAltitude:sky.sun.altitude});
+window.__pond.moonReflection=()=>({preview:sky.isPreview,center:[...water.resources.waterUniforms.uniforms.uMoon].slice(0,2),time:sim.time});
 window.__pond.precipitationBudget=()=>({season:atmosphere.frame.season,rainBudget:atmosphere.frame.rainBudget,rainCount:atmosphere.frame.rainCount,snowCount:atmosphere.frame.snowCount,drawnRain:atmosphere.rain.particleChildren.length,drawnSnow:atmosphere.snow.particleChildren.length,rings:atmosphere.frame.impacts.length});
 window.__pond.meshBudget=()=>({fishVertices:(COLS+1)*(ROWS+1),batchedFish:visuals.filter(v=>v.mesh.batched).length});
 window.__pond.neighborBudget=()=>({checks:sim.neighborChecks,allPairs:sim.fish.length*(sim.fish.length-1),cells:sim.gridHeads.length});
