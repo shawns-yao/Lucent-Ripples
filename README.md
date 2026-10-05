@@ -13,6 +13,19 @@
 - 点击活水吸引附近鱼群。网页中空格暂停、F 切换全屏；窄屏可拖动查看完整池塘。
 - 荷花生长进度保存在当前浏览器，关闭后继续计算真实经过时间。更换地址或清除浏览器数据会影响存档。
 
+## 四季预览
+
+<table>
+  <tr>
+    <td width="50%"><strong>春</strong><br><img src="Image/figures/season-spring.png" alt="春季鱼池" width="100%"></td>
+    <td width="50%"><strong>夏</strong><br><img src="Image/figures/season-summer.png" alt="夏季鱼池" width="100%"></td>
+  </tr>
+  <tr>
+    <td width="50%"><strong>秋</strong><br><img src="Image/figures/season-autumn.png" alt="秋季鱼池" width="100%"></td>
+    <td width="50%"><strong>冬</strong><br><img src="Image/figures/season-winter.png" alt="冬季鱼池" width="100%"></td>
+  </tr>
+</table>
+
 ## 直接使用
 
 下载仓库并解压，或通过 Git 获取：
