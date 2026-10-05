@@ -26,7 +26,7 @@ const sim=new PondSimulation();
 const weather=new WeatherState(),growth=new LotusGrowth();
 const climate=new PondClimate(growth.plants),budget=new FrameBudget();sim.surface=climate;
 const surfaceMotion=new SurfaceMotion();
-const renderResolution=()=>Math.min(devicePixelRatio||1,1.5,2560/Math.max(innerWidth,innerHeight),Math.sqrt(2600000*budget.quality/Math.max(1,innerWidth*innerHeight)));
+const renderResolution=()=>Math.min(devicePixelRatio||1,1.5,2560/Math.max(innerWidth,innerHeight),Math.sqrt(wallpaper.pixelBudget*budget.quality/Math.max(1,innerWidth*innerHeight)));
 const TILT=.9; // A gentle 2.5D oblique overhead projection, not a full 3D camera.
 let paused=false,ready=false,frames=0,lastClick=null,sky=null,skyKey="",skyCheckedAt=0;
 const params=new URLSearchParams(location.search);
@@ -276,7 +276,7 @@ wallpaper.attach({
    if(changed.season)seasons.select(changed.season);
    if(changed.weather||changed.season)weatherUI.setDemo(changed.weather||wallpaper.options.weather);
    if(changed.time)weatherUI.setTime(changed.time);
-   if(changed.fit)fit();
+   if(changed.fit||changed.clarity)fit();
    if(changed.fps){app.ticker.maxFPS=wallpaper.fps;budget.resetClock();}
    if(changed.interaction===false)cancelGesture();
    if(Object.hasOwn(changed,'fishdensity')||changed.effects)refreshScene();

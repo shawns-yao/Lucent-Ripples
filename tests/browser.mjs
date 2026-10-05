@@ -81,7 +81,7 @@ export async function runBrowserChecks(ui) {
   await ui.capture('mobile');
   await ui.size({width:2560,height:1440});
   assert.ok(await ui.read('Math.max(document.querySelector("canvas").width,document.querySelector("canvas").height)')<=2560);
-  assert.ok(await ui.read('window.__pond.performance().drawPixels')<=2600000);
+  assert.ok(await ui.read('window.__pond.performance().drawPixels')<=2560*1440);
   checks.push('手机铺满、暂停时平移与2K绘制限制');
   await ui.click('#pause');
   const running=await sample(3200);
