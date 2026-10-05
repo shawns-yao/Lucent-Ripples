@@ -68,7 +68,7 @@ const shore=new ShoreLife(shoreWorld,initialStyle.shore,initialStyle.winter,init
 shore.flowerSites=lotus.flowerSites;
 const life=new PondLife(world,shoreWorld,initialStyle.life,climate,(x,y)=>shore.canopyAt(x,y));
 const vegetation=new PondVegetation(world,fishes,initialStyle.key);
-const ecology=new PondEcology({world,fishLayer:vegetation.container,shoreWorld,climate,motion:surfaceMotion,flowers:lotus.flowerSites,canopy:(x,y,clearance)=>shore.canopyAt(x,y,clearance),style:initialStyle.key});
+const ecology=new PondEcology({world,fishLayer:vegetation.container,shoreWorld,climate,flowers:lotus.flowerSites,canopy:(x,y,clearance)=>shore.canopyAt(x,y,clearance),style:initialStyle.key});
 const atmosphere=new WeatherEffects(app.stage,climate);
 const weatherUI=setupWeatherUI(weather,growth,refreshScene);
 function applySceneStyle(style){
@@ -159,7 +159,7 @@ function updateSky(date=new Date()){
 }
 function updateLife(w=weather.forScene()){
  lotus.update(sim.time,w,shore.season);shore.snowCover=climate.snowCover;shore.winterAmount=climate.winterAmount;shore.update(sim.time,w);life.update(sim.time,w);
- vegetation.update(sim.time,w,shore.season,sim.fish);ecology.update(sim.time,w,shore.season,sim.fish,life.frogs,shore.butterflies);
+ vegetation.update(sim.time,w,shore.season,sim.fish);ecology.update(sim.time,w,shore.season,sim.fish);
 }
 function updateVisuals(updateAnimals=true){
  updateSky();

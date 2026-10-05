@@ -1,15 +1,15 @@
 import { Container, Sprite, Graphics, MeshSimple } from 'pixi.js';
 import { rng } from './simulation.js';
-import { STATIC_PADS, isWater } from './pond-surface.js';
+import { isWater } from './pond-surface.js';
 import { ecologyArt } from './ecology-art.js';
 
 const clamp=(n,a=0,b=1)=>Math.max(a,Math.min(b,n)),TAU=Math.PI*2;
 const angleDelta=(a,b)=>Math.atan2(Math.sin(a-b),Math.cos(a-b));
-const SHRIMP_HOMES=[[325,633],[418,704],[1264,381],[1393,430],[1327,620]];
+const SHRIMP_HOMES=[[325,633],[418,704],[1264,381],[1393,430],[1327,620],[355,390],[1215,735],[1320,425]];
 
 export class PondEcology {
-  constructor({world,fishLayer,shoreWorld,climate,motion,flowers,canopy,style='natural'}){
-    this.climate=climate;this.motion=motion;this.flowers=flowers;this.canopy=canopy;this.random=rng(581903);this.lastTime=0;
+  constructor({world,fishLayer,shoreWorld,climate,flowers,canopy,style='natural'}){
+    this.climate=climate;this.flowers=flowers;this.canopy=canopy;this.random=rng(581903);this.lastTime=0;
     this.bottom=new Container();this.bottom.label='shallow-shrimp';world.addChildAt(this.bottom,world.getChildIndex(fishLayer));
     this.surface=new Container();this.surface.label='surface-ecology';world.addChild(this.surface);
     this.air=new Container();this.air.label='dragonflies';shoreWorld.addChild(this.air);
@@ -22,32 +22,23 @@ export class PondEcology {
       const sprite=new MeshSimple({texture:this.art.shrimp,vertices,uvs,indices:new Uint32Array(indices)});this.bottom.addChild(sprite);
       return {id,x,y,homeX:x,homeY:y,targetX:x,targetY:y,heading:this.random()*TAU,state:'rest',until:1+id*.9,phase:this.random()*TAU,sprite,base:vertices.slice(),darts:0};
     });
-    this.striders=[[1120,410],[520,615],[1280,500]].map(([x,y],id)=>{
-      const group=new Container(),legs=[];this.surface.addChild(group);
-      for(const side of [-1,1])for(let j=0;j<3;j++){
-        const leg=new Graphics().moveTo(0,0).lineTo(-3-j*2,side*(5+j)).lineTo(2-j*6,side*(9+j)).stroke({color:0x35443a,width:.65,alpha:.85});
-        leg.x=4-j*3;group.addChild(leg);legs.push({sprite:leg,side,j});
-      }
-      group.addChild(new Graphics().ellipse(0,0,5,1.25).fill(0x34463d).ellipse(4,0,1.8,1.6).fill(0x4b5a42));
-      return {id,x,y,homeX:x,homeY:y,targetX:x,targetY:y,heading:this.random()*TAU,state:'rest',until:1+id*.8,nextRipple:0,phase:this.random()*TAU,group,legs,slides:0};
-    });
     this.petals=Array.from({length:6},(_,id)=>{
       const sprite=new Sprite(this.art.petal);sprite.anchor.set(.5);sprite.width=3.5+id%3;sprite.height=6+id%3;sprite.visible=false;this.surface.addChild(sprite);
       return {id,sprite,x:0,y:0,born:-100,life:32,active:false,phase:id*1.8};
     });
     this.nextPetal=2;this.petalCursor=0;
-    this.dragonflies=[[470,605],[1220,510]].map(([x,y],id)=>{
+    this.dragonflies=[[470,605],[1220,510],[1090,760]].map(([x,y],id)=>{
       const shadow=new Graphics().ellipse(0,0,7,2).fill(0x253d32),group=new Container();this.air.addChild(shadow,group);
-      const wings=Array.from({length:4},(_,j)=>{const s=new Sprite(this.art.wing);s.anchor.set(.05,.5);s.width=22;s.height=7;s.x=j<2?7:1;group.addChild(s);return s;});
-      const body=new Sprite(this.art.dragon);body.anchor.set(.5);body.width=30;body.height=10;group.addChild(body);
-      return {id,x,y,homeX:x,homeY:y,heading:this.random()*TAU,height:26,targetX:x+65,targetY:y-35,state:'flight',until:2+id*5,phase:id*2.8,group,body,wings,shadow,perch:null,landings:0};
+      const wings=Array.from({length:4},(_,j)=>{const s=new Sprite(j<2?this.art.wing:this.art.hindwing);s.anchor.set(.05,.5);s.x=j<2?7:4;s.y=j%2?-1:1;group.addChild(s);return s;});
+      const body=new Sprite(this.art.dragon);body.anchor.set(.5);body.width=32;body.height=10.67;group.addChild(body);
+      return {id,x,y,homeX:x,homeY:y,heading:this.random()*TAU,height:26,targetX:x+65,targetY:y-35,state:'flight',until:2+id*2,phase:id*2.8,group,body,wings,shadow};
     });
   }
   setStyle(style){
     this.style=style;this.art=ecologyArt(style);
     for(const s of this.shrimp||[])s.sprite.texture=this.art.shrimp;
     for(const p of this.petals||[])p.sprite.texture=this.art.petal;
-    for(const d of this.dragonflies||[]){d.body.texture=this.art.dragon;for(const wing of d.wings)wing.texture=this.art.wing;}
+    for(const d of this.dragonflies||[]){d.body.texture=this.art.dragon;for(let j=0;j<4;j++)d.wings[j].texture=j<2?this.art.wing:this.art.hindwing;}
   }
   water(x,y){return this.climate.surfaceAt(x,y)==='water';}
   chooseLocalTarget(a,radius,surface){
@@ -65,34 +56,14 @@ export class PondEcology {
     if(valid){a.x=x;a.y=y;return d<3;}
     return true;
   }
-  perchFree(x,y,self,frogs,butterflies){
-    if(this.canopy(x,y,10))return false;
-    for(const d of this.dragonflies)if(d!==self&&d.perch!==null&&Math.hypot(d.targetX-x,d.targetY-y)<40)return false;
-    for(const f of frogs){
-      if(Math.hypot(f.x-x,f.y-y)<40)return false;
-      if(['prepare','jump'].includes(f.state)&&Math.hypot(f.targetX-x,f.targetY-y)<40)return false;
-    }
-    for(const b of butterflies)if(Math.hypot(b.x-x,b.y-y)<26||b.state==='approach'&&Math.hypot(b.targetX-x,b.targetY-y)<26)return false;
-    return true;
-  }
-  takeoff(d,time){
-    d.perch=null;d.state='flight';d.until=time+5+this.random()*5;
+  chooseFlightTarget(d,time){
+    d.until=time+2+this.random()*3;
     for(let i=0;i<12;i++){
       const a=this.random()*TAU,r=50+this.random()*100,x=d.homeX+Math.cos(a)*r,y=d.homeY+Math.sin(a)*r;
-      if(isWater(x,y)&&!this.canopy(x,y,25)){d.targetX=x;d.targetY=y;break;}
+      if(isWater(x,y)&&Math.hypot(x-d.x,y-d.y)>65&&!this.canopy(x,y,25)){d.targetX=x;d.targetY=y;break;}
     }
   }
-  choosePerch(d,time,frogs,butterflies){
-    const n=STATIC_PADS.length+this.climate.leaves.length,start=Math.floor(this.random()*n);
-    for(let j=0;j<n;j++){
-      const index=(start+j)%n,leaf=index<STATIC_PADS.length?STATIC_PADS[index]:null,p=this.climate.leaves[index-STATIC_PADS.length];
-      const x=leaf?leaf[0]:p.x,y=leaf?leaf[1]:p.y,r=leaf?Math.min(leaf[2],leaf[3]):p.radius;
-      if(r<22||Math.hypot(x-d.homeX,y-d.homeY)>230||!this.perchFree(x,y,d,frogs,butterflies))continue;
-      d.perch=index;d.targetX=x;d.targetY=y;d.state='approach';d.until=time+8;return;
-    }
-    this.takeoff(d,time);
-  }
-  update(time,weather,season,fish,frogs,butterflies){
+  update(time,weather,season,fish){
     const dt=clamp(time-this.lastTime,0,.1);this.lastTime=time;
     const cold=season==='winter'||this.climate.winter,calm=clamp(1-weather.rain*1.8-weather.snow*2)*clamp(1-(weather.wind-5)/8);
     const day=cold?0:clamp((weather.light-.28)/.45)*calm;
@@ -110,22 +81,6 @@ export class PondEcology {
       s.sprite.position.set(s.x,s.y);s.sprite.rotation=s.heading;s.sprite.alpha=this.style==='cartoon'?.78:.65;
       const v=s.sprite.vertices,activity=s.state==='rest'?.16:s.state==='dart'?1:.4;
       for(let j=0;j<6;j++)for(let side=0;side<2;side++){const k=(j*2+side)*2;v[k+1]=s.base[k+1]+Math.sin(time*8+s.phase+j)*Math.pow(1-j/5,2)*activity*2.2;}
-    }
-    for(const s of this.striders){
-      s.group.visible=day>.02&&this.water(s.x,s.y);s.group.alpha=day*.82;
-      if(day>.02&&dt>0){
-        if(time>=s.until){
-          s.state=s.state==='rest'?'slide':'rest';s.until=time+(s.state==='rest'?2+this.random()*4:1.2+this.random()*1.5);
-          if(s.state==='slide'){this.chooseLocalTarget(s,65,true);s.slides++;}
-        }
-        if(s.state==='slide'){
-          if(this.move(s,23,dt,true)){s.state='rest';s.until=time+2;}
-          if(time>=s.nextRipple){this.motion.emit(s.x,s.y,time,.13,'strider',this.climate);s.nextRipple=time+1.6;}
-        }
-      }
-      s.group.position.set(s.x,s.y);s.group.rotation=s.heading;
-      const stroke=s.state==='slide'?Math.sin(time*11+s.phase)*.16:0;
-      for(const leg of s.legs)leg.sprite.rotation=stroke*leg.side*(leg.j===0?.3:1);
     }
     if(cold){for(const p of this.petals){p.active=false;p.sprite.visible=false;}this.nextPetal=time+3;}
     else if(time>=this.nextPetal&&dt>0){
@@ -148,31 +103,29 @@ export class PondEcology {
     for(const d of this.dragonflies){
       d.group.visible=d.shadow.visible=day>.02;d.group.alpha=day;
       if(day>.02&&dt>0){
-        if(d.perch!==null&&!this.perchFree(d.targetX,d.targetY,d,frogs,butterflies))this.takeoff(d,time);
-        if(d.state==='rest'){
-          if(time>=d.until)this.takeoff(d,time);
-        }else{
-          if(time>=d.until){if(d.state==='flight')this.choosePerch(d,time,frogs,butterflies);else this.takeoff(d,time);}
-          const dx=d.targetX-d.x,dy=d.targetY-d.y,distance=Math.hypot(dx,dy),approach=d.state==='approach';
-          d.heading+=angleDelta(Math.atan2(dy,dx),d.heading)*Math.min(1,dt*(approach?9:5));
-          const speed=Math.min(distance*(approach?3:2),approach?95:130),x=d.x+Math.cos(d.heading)*speed*dt,y=d.y+Math.sin(d.heading)*speed*dt;
-          if(!this.canopy(x,y,10)){d.x=x;d.y=y;}else this.takeoff(d,time);
-          const height=approach?clamp(distance/75)*28:23+Math.sin(time*2+d.phase)*7;
-          d.height+=(height-d.height)*Math.min(1,dt*7);
-          if(approach&&distance<2&&d.height<1.5){d.x=d.targetX;d.y=d.targetY;d.height=0;d.state='rest';d.until=time+7+this.random()*7;d.landings++;}
-          else if(!approach&&distance<10)this.choosePerch(d,time,frogs,butterflies);
-        }
+        if(time>=d.until||Math.hypot(d.targetX-d.x,d.targetY-d.y)<24)this.chooseFlightTarget(d,time);
+        const dx=d.targetX-d.x,dy=d.targetY-d.y,distance=Math.hypot(dx,dy);
+        d.heading+=angleDelta(Math.atan2(dy,dx),d.heading)*Math.min(1,dt*4.5);
+        const speed=Math.min(distance*2,90+Math.sin(time*1.7+d.phase)*30),x=d.x+Math.cos(d.heading)*speed*dt,y=d.y+Math.sin(d.heading)*speed*dt;
+        if(isWater(x,y)&&!this.canopy(x,y,18)){d.x=x;d.y=y;}else this.chooseFlightTarget(d,time);
+        const height=29+Math.sin(time*1.8+d.phase)*7;
+        d.height+=(height-d.height)*Math.min(1,dt*4);
       }
       d.group.position.set(d.x,d.y-d.height);d.group.rotation=d.heading;
-      for(let j=0;j<4;j++){const side=j%2?-1:1,base=j<2?1.08:1.92;d.wings[j].rotation=side*(base+(d.state==='rest'?0:Math.sin(time*67+d.phase)*.13));d.wings[j].scale.y=(d.state==='rest'?1:.45+Math.abs(Math.sin(time*67+d.phase))*.55)*7/32;}
+      // Fore and hind pairs keep separate thorax joints and opposite stroke phases.
+      for(let j=0;j<4;j++){
+        const side=j%2?-1:1,front=j<2,stroke=Math.sin(time*83+d.phase+(front?0:Math.PI*.75));
+        d.wings[j].rotation=side*((front?1.22:1.94)+stroke*.14);
+        d.wings[j].scale.set((front?23:21)/96*(.9+stroke*.08),side*(front?7:9)/32);
+        d.wings[j].alpha=.76+Math.abs(stroke)*.2;
+      }
       d.shadow.position.set(d.x+d.height*.23,d.y+d.height*.14);d.shadow.alpha=day*.12/(1+d.height*.035);d.shadow.scale.set(1+d.height*.015);
     }
   }
   snapshot(){
     return {season:this.season,activeDay:this.activeDay,
       shrimp:this.shrimp.map(s=>({id:s.id,x:s.x,y:s.y,homeX:s.homeX,homeY:s.homeY,state:s.state,darts:s.darts,visible:s.sprite.visible})),
-      striders:this.striders.map(s=>({id:s.id,x:s.x,y:s.y,state:s.state,slides:s.slides,visible:s.group.visible})),
       petals:this.petals.map(p=>({id:p.id,x:p.x,y:p.y,born:p.born,active:p.active,visible:p.sprite.visible})),
-      dragonflies:this.dragonflies.map(d=>({id:d.id,x:d.x,y:d.y,height:d.height,screenY:d.group.y,shadowY:d.shadow.y,state:d.state,perch:d.perch,targetX:d.targetX,targetY:d.targetY,landings:d.landings,visible:d.group.visible}))};
+      dragonflies:this.dragonflies.map(d=>({id:d.id,x:d.x,y:d.y,height:d.height,screenY:d.group.y,shadowY:d.shadow.y,state:d.state,targetX:d.targetX,targetY:d.targetY,visible:d.group.visible}))};
   }
 }
