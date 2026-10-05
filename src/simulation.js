@@ -34,6 +34,8 @@ export class PondSimulation {
       return f;
     });
     this.previous=this.fish.map(()=>({x:0,y:0,vx:0,vy:0,angle:0,group:0}));this.boundaryHint={};
+    this.cellSize=180;this.gridColumns=Math.ceil(width/this.cellSize);this.gridRows=Math.ceil(height/this.cellSize);
+    this.gridHeads=new Int32Array(this.gridColumns*this.gridRows);this.gridNext=new Int32Array(count);this.neighborChecks=0;
   }
   setMotion(f,state) {
     const r=f.motionRandom;
@@ -99,13 +101,19 @@ export class PondSimulation {
     const dt=Number.isFinite(delta)?clamp(delta,0,1/20):0;
     if(dt===0)return;
     this.time+=dt;
-    this.attractors=this.attractors.filter(a=>this.time-a.created<a.life);
+    let active=0;for(const a of this.attractors)if(this.time-a.created<a.life)this.attractors[active++]=a;this.attractors.length=active;
     // Take a snapshot before the force pass: order-independent flock behavior.
     const old=this.previous;
     for(let i=0;i<this.fish.length;i++){const f=this.fish[i],p=old[i];p.x=f.x;p.y=f.y;p.vx=f.vx;p.vy=f.vy;p.angle=f.angle;p.group=f.group;}
+    this.gridHeads.fill(-1);this.neighborChecks=0;
+    for(let i=0;i<old.length;i++){
+      const p=old[i],cx=clamp(Math.floor(p.x/this.cellSize),0,this.gridColumns-1),cy=clamp(Math.floor(p.y/this.cellSize),0,this.gridRows-1),cell=cy*this.gridColumns+cx;
+      this.gridNext[i]=this.gridHeads[cell];this.gridHeads[cell]=i;
+    }
     for(let i=0;i<this.fish.length;i++) {
       const f=this.fish[i], p=old[i];
-      f.waterDepth=waterDepth(f.x,f.y,shoreDistance(f.x,f.y,this.boundaryHint).distance);
+      const boundary=shoreDistance(f.x,f.y,this.boundaryHint);
+      f.waterDepth=waterDepth(f.x,f.y,boundary.distance);
       const submerged=f.waterDepth*(.3+f.depth*.4+.08*Math.sin(this.time*.13+f.phase));
       f.submergence+=(submerged-f.submergence)*Math.min(1,dt*.7);
       if(f.target && (this.time>f.leaveAt||this.time-f.target.created>f.target.life)) f.target=null;
@@ -120,8 +128,10 @@ export class PondSimulation {
       const wander=f.angle+Math.sin(this.time*.39+f.phase)*.75+Math.sin(this.time*.13+f.phase*2)*.4;
       let fx=Math.cos(wander)*.78, fy=Math.sin(wander)*.78;
       let sx=0,sy=0,ax=0,ay=0,cx=0,cy=0,neighbors=0;
-      for(let j=0;j<old.length;j++) {
+      const cellX=Math.floor(p.x/this.cellSize),cellY=Math.floor(p.y/this.cellSize);
+      for(let gy=Math.max(0,cellY-1);gy<=Math.min(this.gridRows-1,cellY+1);gy++)for(let gx=Math.max(0,cellX-1);gx<=Math.min(this.gridColumns-1,cellX+1);gx++)for(let j=this.gridHeads[gy*this.gridColumns+gx];j!==-1;j=this.gridNext[j]) {
         if(i===j) continue;
+        this.neighborChecks++;
         const o=old[j], dx=o.x-p.x,dy=o.y-p.y,dist=Math.hypot(dx,dy);
         const separation=(f.length+this.fish[j].length)*.66;
         if(dist>0&&dist<separation) { const strength=(1-dist/separation)*2.7; sx-=dx/dist*strength;sy-=dy/dist*strength; }
@@ -161,7 +171,6 @@ export class PondSimulation {
       if(f.x>this.width-margin)fx-=(f.x-this.width+margin)/margin*5;
       if(f.y<margin)fy+=(margin-f.y)/margin*5;
       if(f.y>this.height-margin)fy-=(f.y-this.height+margin)/margin*5;
-      const boundary=shoreDistance(f.x,f.y,this.boundaryHint);
       if(boundary.distance<65){const strength=(65-boundary.distance)/22;fx+=boundary.nx*strength;fy+=boundary.ny*strength;}
       for(const [rx,ry,rw,rh] of ROCKS) {
         const dx=f.x-rx,dy=f.y-ry,ellipse=(dx/(rw+28))**2+(dy/(rh+28))**2;
