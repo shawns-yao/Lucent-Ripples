@@ -8,9 +8,9 @@ export async function runWinterChecks(ui){
   const results=[];
   await pause(true);await panel(true);await ui.click('[data-season="summer"]');await ui.click('[data-weather="clear"]');await ui.click('[data-time="day"]');await panel(false);
   await ui.size({width:2560,height:1440});await pause(false);await ui.wait(8000);
-  const summer=await ui.read('__pond.snapshot().fish.reduce((s,f)=>s+f.speed,0)/44');
+  const summer=await ui.read('__pond.seasonScene().fish.filter(f=>f.active).reduce((s,f)=>s+f.speed,0)/__pond.seasonScene().activeFish');
   await pause(true);await panel(true);await ui.click('[data-season="winter"]');await panel(false);await pause(false);await ui.wait(8000);
-  const winter=await ui.read('({speed:__pond.snapshot().fish.reduce((s,f)=>s+f.speed,0)/44,depth:__pond.snapshot().fish.reduce((s,f)=>s+f.submergence/Math.max(.01,f.waterDepth),0)/44,performance:__pond.performance()})');
+  const winter=await ui.read('({speed:__pond.seasonScene().fish.filter(f=>f.active).reduce((s,f)=>s+f.speed,0)/10,depth:__pond.seasonScene().fish.filter(f=>f.active).reduce((s,f)=>s+f.depth,0)/10,performance:__pond.performance()})');
   assert.ok(winter.speed<summer*.85);assert.ok(winter.depth>.72);
   assert.equal(await ui.read('__pond.surfaceMotion().active.some(p=>p.kind==="leaf")'),false);
   await pause(true);
@@ -22,8 +22,9 @@ export async function runWinterChecks(ui){
     assert.ok(state.winter.active&&state.winter.remnants);assert.equal(state.occlusion.leafPixels,0);
     assert.ok(state.plants.plants.every(p=>!p.visible&&!p.flowerVisible));assert.equal(state.fish,44);assert.equal(state.passes,1);
     assert.ok(state.winter.probes.slice(0,4).every(p=>p.surface==='ice'));assert.ok(state.winter.probes.slice(4).every(p=>p.surface==='water'));
-    assert.equal(await ui.read('__pond.surfaceAt(873,826)'), 'water');
-    for(const [x,y,accepted] of [[400,180,false],[650,355,true],[873,826,true]]){
+    assert.equal(await ui.read('__pond.seasonScene().visibleFish'),10);
+    assert.equal(await ui.read('__pond.surfaceAt(873,826)'), 'ice');
+    for(const [x,y,accepted] of [[400,180,false],[650,355,true],[873,826,false]]){
       const p=await ui.read(`({x:__pond.viewport().x+${x}*__pond.viewport().scaleX,y:__pond.viewport().y+${y}*__pond.viewport().scaleY})`);
       await ui.tap(p.x,p.y);assert.equal(await ui.read('__pond.lastClick.accepted'),accepted);
     }
@@ -35,7 +36,29 @@ export async function runWinterChecks(ui){
     assert.deepEqual(await ui.read('__pond.growth().map(p=>p.bornAt)'),births);
     await panel(true);await ui.click('[data-season="winter"]');await panel(false);
   }
-  return {type:'定向测试',summerSpeed:summer,winter,results,checks:['冬季两种底图与残荷','冰面拒绝点击和雨滴波纹','中央与移除荷叶处可互动','暖季恢复及生长日期保留','鱼减速和下潜','单水面滤镜及2K预算']};
+  return {type:'定向测试',summerSpeed:summer,winter,results,checks:['冬季两种底图与残荷','冰面拒绝点击和雨滴波纹','中央活水可互动及浅水冻结','暖季恢复及生长日期保留','鱼减速和下潜','单水面滤镜及2K预算']};
+}
+
+// 定向测试：通过页面的季节按钮验证显示数量、恢复与保存记录。
+export async function runSeasonChecks(ui){
+  if(!await ui.read('__pond.paused'))await ui.click('#pause');
+  if(!await ui.read('document.querySelector("#weather-panel").open'))await ui.click('#weather-summary');
+  const births=await ui.read('__pond.growth().map(p=>p.bornAt)'),results=[];
+  for(const style of ['natural','cartoon']){
+    await ui.click(`button[data-scene-style="${style}"]`);
+    for(let i=0;i<50&&await ui.read('__pond.appearance().pending!==null');i++)await ui.wait(100);
+    for(const [season,count] of [['spring',32],['summer',44],['autumn',28],['winter',10]]){
+      await ui.click(`[data-season="${season}"]`);
+      const state=await ui.read('({scene:__pond.seasonScene(),plants:__pond.plantsDisplay()})');
+      assert.equal(state.scene.activeFish,count);assert.equal(state.scene.visibleFish,count);
+      assert.ok(state.scene.fish.filter(f=>!f.active).every(f=>!f.visible&&f.speed===0));
+      assert.deepEqual(await ui.read('__pond.growth().map(p=>p.bornAt)'),births);
+      if(season==='autumn'||season==='winter')assert.ok(state.plants.plants.every(p=>!p.flowerVisible));
+      if(season==='winter')assert.ok(state.scene.leafRadii.every(r=>r===0));
+      results.push({style,season,count,leafRadii:state.scene.leafRadii});
+    }
+  }
+  await ui.click('#weather-summary');return {type:'定向测试',results};
 }
 
 export async function runFrogFlowerChecks(ui){
