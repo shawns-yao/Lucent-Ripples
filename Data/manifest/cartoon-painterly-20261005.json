@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-05",
+  "tool": "imagegen built-in",
+  "purpose": "桌面鱼池手绘卡通材质更新",
+  "reference": "用户提供的时间面板与手绘鱼池参考图",
+  "conversion": "PNG 转 WebP，quality 94，alphaQuality 100，保持原始尺寸",
+  "assets": [
+    {
+      "path": "public/assets/pond-cartoon.webp",
+      "size": [1672, 941],
+      "prompt": "Use case: style-transfer. Asset: top-down pond game background texture, landscape 2560x1440. Image 1 is EDIT TARGET and exact geometry/layout map. Image 2 is STYLE reference only: painterly animated-film pond, translucent jade-turquoise water, brush-textured rounded stones with warm sunlit tops, cool shaded sides, dark damp waterlines, soft submerged sand and restrained water light. Transform image 1 from flat vector coloring into that richer hand-painted style. Preserve EVERY stone and EVERY lily pad exact normalized position, outline, size, and cut-out notch; preserve shoreline shape and strict top-down camera, no perspective horizon. All leaf green-yellow colors retained for foreground extraction. Add fine painterly stone mineral and leaf vein details, warm sand shallow margins, deep cool quiet water middle, gently broken natural color gradients. Keep image sharp, high-detail at 2K, no lens blur. Do NOT add fish, animals, flowers, foliage in foreground, text, UI, or extra stones/leaves. Do NOT copy clock or scene composition from image 2. Do not bake bright caustic stripes or prominent ripples: animated water will be overlaid in game. Full opaque background. Preserve overall original composition with open central water."
+    },
+    {
+      "path": "public/assets/fish-cartoon.webp",
+      "size": [1536, 1024],
+      "alpha": true,
+      "prompt": "Use case: style-transfer. Production sprite atlas 1536x1024 RGBA with genuinely transparent background. Image 1 is exact EDIT TARGET atlas, image2 is STYLE REFERENCE only for warm painterly fish. Redraw all SIX fish as high-quality hand-painted animated-film sprites with round dimensional bodies, soft rich orange/gold colors, subtle irregular painted scales, fine translucent flowing fins, restrained natural eyes. Avoid glossy plastic/toy look, hard white outline, vector blocks or dense photographic scales. Keep EXACT 2 columns x3 rows equal grid and exact existing silhouette sizes, fish center and orientation: all HEAD RIGHT, TAIL LEFT, strictly overhead view with both eyes visible, no side-view fish. Cells same positions as image1: row1 orange goldfish / orange-white clownfish, row2 golden goldfish / blue yellow-finned fish, row3 red-white goldfish / warm orange-white clownfish. Keep all pixels inside their original individual cell; transparent gutters, no baked shadows, no water, no labels. Image2 must not be included in output. This is a drop-in texture for existing fish deformation; preserve anatomy, layout and transparent silhouette but elevate brush texture and volume."
+    },
+    {
+      "path": "public/assets/pond-winter-cartoon.webp",
+      "size": [1672, 941],
+      "prompt": "Use case: style-transfer. Image1 EDIT TARGET exact geometry winter pond map; image2 STYLE reference of same pond after painterly upgrade. Repaint image1 to match painterly stone mineral textures, translucent turquoise jade water, warm sandy shallows, subtle broken brush shading in image2. Preserve EVERY stone and shoreline exact normalized location, size and outline from image1. Preserve top-down orthographic camera and canvas ratio. Very important winter variation: NO green lily pads, no flowers, no animals, no fish, no trees, no text, no added stones. Water stays exposed: do NOT paint ice or snow, these are added by the live shader. Quiet deep cool central water, shallow mottling near shores only, not random heavy noise. Match image2 rocks and water materials as closely as possible but with NO leaves. High quality sharp game background."
+    }
+  ],
+  "limitations": "底图实际输出为 1672×941，未通过放大冒充 2K 原始纹理；2K 为运行时绘制上限。"
+}

@@ -126,7 +126,7 @@ void main() {
   vec4 color=texture(uTexture,clamp(uv+shift,uInputClamp.xy,uInputClamp.zw));
   float depth=terrain.b;
   vec3 shallow=color.rgb*vec3(1.025,1.012,.96);
-  vec3 deep=color.rgb*vec3(.63,.79,.85)+vec3(.005,.018,.024);
+  vec3 deep=color.rgb*mix(vec3(.63,.79,.85),vec3(.83,.92,.96),uStyle)+vec3(.005,.018,.024);
   color.rgb=mix(color.rgb,mix(shallow,deep,depth),wet);
   vec3 seasonWater=uSeason<.5?vec3(.95,1.08,.96):uSeason<1.5?vec3(1.):uSeason<2.5?vec3(1.14,.99,.80):vec3(.78,.90,1.06);
   color.rgb=mix(color.rgb,color.rgb*seasonWater,wet*.85);
@@ -140,10 +140,10 @@ void main() {
   w+=vec2(sin(w.y*2.2+t*.19)+sin(w.x*1.6-w.y+t*.11),cos(w.x*2.1-t*.15)+sin(w.y*1.7+w.x-t*.13))*.36;
   w+=vec2(sin(w.y*4.7-t*.21),cos(w.x*4.2+t*.17))*.09;
   float caustic=0.,broad=0.;
-  if(uStyle<.5&&uEffects>.5){
+  if(uEffects>.5){
     float line=abs(sin(w.x*2.5+sin(w.y*1.8)*1.6)+sin(w.y*2.9-w.x*.6)*.42);
-    caustic=exp(-line*mix(15.,24.,uClimate.z))*.046;
-    broad=exp(-line*6.0)*.012;
+    caustic=exp(-line*mix(15.,24.,uClimate.z))*mix(.046,.025,uStyle);
+    broad=exp(-line*6.0)*mix(.012,.022,uStyle);
   }
   float curved=sin(localWorld.x*.017+localWorld.y*.009+sin(localWorld.y*.022-t*.18)*1.9+t*.24);
   float ribbon=exp(-abs(curved)*mix(54.,32.,uStyle))*noise(localWorld*.008+vec2(t*.015,0.))*mix(.025,.014,uStyle);
