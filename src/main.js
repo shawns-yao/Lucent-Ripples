@@ -55,7 +55,7 @@ const visuals=sim.fish.map(f=>{
 });
 const pads=new Sprite(initialStyle.surface.texture);pads.width=WORLD.width;pads.height=WORLD.height;world.addChild(pads);
 let surfaceOcclusion=initialStyle.surface;
-const lotus=new LotusVisuals(world,initialStyle.lotus,growth);
+const lotus=new LotusVisuals(world,initialStyle.lotus,growth,shadows);
 const water=createWaterFilter(climate.texture,moonTexture,initialStyle.surface.texture);world.filters=[water];world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
 // Tiny bits of drifting pollen lend depth without turning the water into a particle effect.
 const motes=new Container();world.addChild(motes);

@@ -3,6 +3,7 @@ import { precipitationFrame, createPrecipitationFrame, PRECIPITATION_PARTICLES, 
 import { lotusAppearance } from './lotus-growth.js';
 import { rng } from './simulation.js';
 import { createFoliageFilter } from './tree-seasons.js';
+import { COMPANION_PADS } from './pond-layout.js';
 
 function snowTextures() {
   const canvas=document.createElement('canvas');canvas.width=512;canvas.height=64;
@@ -73,13 +74,31 @@ export class WeatherEffects {
 }
 
 export class LotusVisuals {
-  constructor(world, atlas, growth){
+  constructor(world, atlas, growth, shadowLayer){
     this.container=new Container();world.addChild(this.container);this.growth=growth;
     this.winterFilter=createFoliageFilter();
     this.winterFilter.resources.seasonUniforms.uniforms.uFoliage=[.89,.73,.49,1];
     this.textureSets=new Map();this.setStyle(atlas);
+    this.shadows=new Container();shadowLayer.addChild(this.shadows);
+    this.companionLayer=new Container();this.container.addChild(this.companionLayer);
+    this.companions=COMPANION_PADS.map(([x,y,rx,ry],i)=>{
+      const leaf=new Sprite(this.textures[2]),shadow=new Sprite(this.textures[2]);
+      leaf.anchor.set(.5);leaf.position.set(x,y);leaf.width=rx*2.28;leaf.height=ry*2.28;leaf.rotation=i*1.7;
+      shadow.anchor.set(.5);shadow.position.set(x+5,y+7);shadow.width=leaf.width*1.06;shadow.height=leaf.height*1.06;shadow.rotation=leaf.rotation;shadow.tint=0x18392e;shadow.alpha=.14;
+      this.shadows.addChild(shadow);this.companionLayer.addChild(leaf);return {leaf,shadow};
+    });
     this.flowerSites=growth.plants.map(p=>({id:p.id,x:p.x+12,y:p.y,height:14,available:false}));
-    this.plants=growth.plants.map(p=>{const group=new Container();group.position.set(p.x,p.y);this.container.addChild(group);const leaves=new Container();const flower=new Container();group.addChild(leaves,flower);const underlay=new Sprite(this.textures[0]);underlay.anchor.set(.5);leaves.addChild(underlay);const leafSprites=Array.from({length:3},(_,i)=>{const s=new Sprite(this.textures[i]);s.anchor.set(.5);leaves.addChild(s);return s;});const blooms=Array.from({length:3},(_,i)=>{const s=new Sprite(this.textures[3+i]);s.anchor.set(.5);flower.addChild(s);return s;});return{group,leaves,flower,underlay,leafSprites,blooms};});
+    this.plants=growth.plants.map(p=>{
+      const group=new Container();group.position.set(p.x,p.y);this.container.addChild(group);
+      const leaves=new Container(),flower=new Container();group.addChild(leaves,flower);
+      const underlay=new Sprite(this.textures[0]);underlay.anchor.set(.5);leaves.addChild(underlay);
+      const leafSprites=Array.from({length:3},(_,i)=>{const s=new Sprite(this.textures[i]);s.anchor.set(.5);leaves.addChild(s);return s;});
+      const blooms=Array.from({length:3},(_,i)=>{const s=new Sprite(this.textures[3+i]);s.anchor.set(.5);flower.addChild(s);return s;});
+      const shadow=new Sprite(this.textures[0]),flowerShadow=new Sprite(this.textures[3]);
+      for(const s of [shadow,flowerShadow]){s.anchor.set(.5);s.tint=0x18392e;this.shadows.addChild(s);}
+      shadow.alpha=.13;flowerShadow.alpha=.12;
+      return{group,leaves,flower,underlay,leafSprites,blooms,shadow,flowerShadow};
+    });
   }
   setStyle(atlas){
     if(!this.textureSets.has(atlas)){
@@ -87,6 +106,7 @@ export class LotusVisuals {
       this.textureSets.set(atlas,Array.from({length:6},(_,i)=>new Texture({source:atlas.source,frame:new Rectangle(i%3*cellW,Math.floor(i/3)*cellH,cellW,cellH)})));
     }
     this.textures=this.textureSets.get(atlas);
+    for(const {leaf,shadow} of this.companions||[]){leaf.texture=this.textures[2];shadow.texture=this.textures[2];}
     for(const plant of this.plants||[]){
       plant.leafSprites.forEach((sprite,i)=>sprite.texture=this.textures[i]);
       plant.underlay.texture=this.textures[0];
@@ -95,16 +115,21 @@ export class LotusVisuals {
   }
   update(time,weather,season='summer'){
     const changed=this.season!==season;this.season=season;const dormant=season==='winter';
+    if(changed)this.companionLayer.filters=dormant?[this.winterFilter]:null;
+    const blossoms=[0,0];
     this.growth.plants.forEach((p,i)=>{const v=this.plants[i],{visible,leafScale:size,leafStage,bloomStage,bloomScale}=lotusAppearance(p.age);v.group.visible=visible;
       v.group.x=p.x+Math.sin(time*.6+p.phase)*weather.wind*.26;v.group.y=p.y+Math.cos(time*.5+p.phase)*weather.wind*.15;
       v.leaves.rotation=Math.sin(time*.48+p.phase)*(.012+weather.wind*.003);v.leaves.scale.set((82/this.textures[0].width)*size);
       if(changed)v.leaves.filters=dormant?[this.winterFilter]:null;
-      v.flower.visible=!dormant;
+      v.flower.visible=!dormant&&blossoms[p.cluster]<2;
+      if(visible&&bloomScale>0&&v.flower.visible)blossoms[p.cluster]++;
       v.underlay.texture=this.textures[Math.floor(leafStage)];
       v.leafSprites.forEach((s,n)=>{s.alpha=Math.max(0,1-Math.abs(leafStage-n));});
       v.flower.position.set(12,-14);v.flower.scale.set((49/this.textures[3].width)*bloomScale);v.flower.rotation=Math.sin(time*.7+p.phase)*weather.wind*.002;
       v.blooms.forEach((s,n)=>s.alpha=Math.max(0,1-Math.abs(bloomStage-n)));
-      const site=this.flowerSites[i];site.x=v.group.x+12;site.y=v.group.y;site.available=!dormant&&visible&&bloomScale>.7&&bloomStage>.7;
+      v.shadow.texture=this.textures[Math.round(leafStage)];v.shadow.visible=visible;v.shadow.position.set(v.group.x+5,v.group.y+7);v.shadow.scale.set(v.leaves.scale.x*1.04);v.shadow.rotation=v.leaves.rotation;
+      v.flowerShadow.texture=this.textures[3+Math.round(bloomStage)];v.flowerShadow.visible=visible&&v.flower.visible;v.flowerShadow.position.set(v.group.x+18,v.group.y+5);v.flowerShadow.scale.set(v.flower.scale.x*1.08);
+      const site=this.flowerSites[i];site.x=v.group.x+12;site.y=v.group.y;site.available=v.flower.visible&&visible&&bloomScale>.7&&bloomStage>.7;
     });
   }
   snapshot(){return {season:this.season,dormant:this.season==='winter',plants:this.plants.map((v,i)=>({id:this.growth.plants[i].id,visible:v.group.visible,flowerVisible:v.group.visible&&v.flower.visible&&v.flower.scale.x>0,withered:Boolean(v.leaves.filters?.length)}))};}

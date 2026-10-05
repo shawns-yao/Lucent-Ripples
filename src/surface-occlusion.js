@@ -1,5 +1,5 @@
 import { Texture } from 'pixi.js';
-import { STATIC_PADS, ROCKS } from './pond-surface.js';
+import { PAINTED_PADS, ROCKS } from './pond-surface.js';
 
 // Extract the painted foreground once per style. Ellipses locate the leaves;
 // their actual colors retain the outline and open notches in each background.
@@ -10,7 +10,7 @@ export function createSurfaceOcclusion(bottom, style) {
   const pixels=context.getImageData(0,0,canvas.width,canvas.height),data=pixels.data;
   const coverage=new Uint8Array(canvas.width*canvas.height);
   let leafPixels=0;
-  for(const [cx,cy,rx,ry] of STATIC_PADS) {
+  for(const [cx,cy,rx,ry] of PAINTED_PADS) {
     const left=Math.max(0,Math.floor(cx-rx*1.35)),right=Math.min(canvas.width-1,Math.ceil(cx+rx*1.35));
     const top=Math.max(0,Math.floor(cy-ry*1.45)),bottom=Math.min(canvas.height-1,Math.ceil(cy+ry*1.45));
     const width=right-left+1,height=bottom-top+1,patch=new Uint8Array(width*height),queue=new Int32Array(patch.length);
