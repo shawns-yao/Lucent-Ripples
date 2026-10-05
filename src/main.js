@@ -17,6 +17,7 @@ import { wallpaper } from './wallpaper.js';
 import { SurfaceMotion } from './surface-motion.js';
 import { PondVegetation } from './pond-vegetation.js';
 import { PondEcology } from './pond-ecology.js';
+import { createWinterRemnants } from './winter-scene.js';
 import './style.css';
 const host=document.querySelector('#pond');
 const app=new Application();
@@ -58,8 +59,9 @@ const visuals=sim.fish.map(f=>{
  shadows.addChild(shadow);fishes.addChild(mesh);return {mesh,shadow};
 });
 const pads=new Sprite(initialStyle.surface.texture);pads.width=WORLD.width;pads.height=WORLD.height;world.addChild(pads);
-let surfaceOcclusion=initialStyle.surface;
+let surfaceOcclusion=initialStyle.surface,activeStyle=initialStyle,shownWinter=null;
 const lotus=new LotusVisuals(world,initialStyle.lotus,growth,shadows);
+const winterRemnants=createWinterRemnants(world);
 const water=createWaterFilter(climate.texture,moonTexture,initialStyle.surface.texture);world.filters=[water];world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
 // Tiny bits of drifting pollen lend depth without turning the water into a particle effect.
 const motes=new Container();world.addChild(motes);
@@ -72,6 +74,7 @@ const ecology=new PondEcology({world,fishLayer:vegetation.container,shoreWorld,c
 const atmosphere=new WeatherEffects(app.stage,climate);
 const weatherUI=setupWeatherUI(weather,growth,refreshScene);
 function applySceneStyle(style){
+ activeStyle=style;shownWinter=null;
  bg.texture=style.bottom;pads.texture=style.surface.texture;surfaceOcclusion=style.surface;
  bg.width=pads.width=WORLD.width;bg.height=pads.height=WORLD.height;
  for(let i=0;i<visuals.length;i++){
@@ -150,6 +153,14 @@ function updateSky(date=new Date()){
    }
  }
  shore.season=seasons.current(date,climate.winter);life.seasonWinter=shore.season==='winter';
+ climate.seasonWinter=shore.season==='winter';climate.updatePlants();
+ if(shownWinter!==climate.seasonWinter){
+   shownWinter=climate.seasonWinter;
+   bg.texture=shownWinter?activeStyle.winterBottom:activeStyle.bottom;
+   surfaceOcclusion=shownWinter?activeStyle.winterSurface:activeStyle.surface;
+   pads.texture=surfaceOcclusion.texture;water.resources.uSurface=surfaceOcclusion.texture.source;
+   bg.width=pads.width=WORLD.width;bg.height=pads.height=WORLD.height;winterRemnants.visible=shownWinter;
+ }
  const key=JSON.stringify([weather.timeMode,weather.location]);
  if(!sky||key!==skyKey||Math.abs(date.getTime()-skyCheckedAt)>=1000){
    sky=celestialAt({date,location:weather.location,timeMode:weather.timeMode,weather:weather.current});skyKey=key;skyCheckedAt=date.getTime();
@@ -168,12 +179,12 @@ function updateVisuals(updateAnimals=true){
    const clearance=Math.max(0,f.waterDepth-f.submergence);
    shadow.position.set(mesh.x+4+clearance*19,mesh.y+5+clearance*25);shadow.rotation=mesh.rotation;
    shadow.scale.set(1+clearance*.16);shadow.alpha=.17-clearance*.18;
-   mesh.alpha=(.96-f.submergence*.26)*(1-climate.iceAt(f.x,f.y)*.32);
+   mesh.alpha=(.96-f.submergence*(climate.seasonWinter?.65:.26))*(1-climate.iceAt(f.x,f.y)*.65);
  });
  const u=water.resources.waterUniforms.uniforms;u.uTime=sim.time;
  u.uWinter=shore.season==='winter'?1:0;
  const w=weather.forScene();u.uWeather[0]=w.cloud;u.uWeather[1]=w.light;u.uWeather[2]=w.wind/12;u.uWeather[3]=w.snow;u.uWind[0]=w.windX;u.uWind[1]=w.windY;
- u.uClimate[0]=climate.freeze;u.uClimate[1]=climate.snowCover;u.uClimate[2]=budget.quality;u.uClimate[3]=w.temp;
+ u.uClimate[0]=climate.iceLevel;u.uClimate[1]=climate.snowCover;u.uClimate[2]=budget.quality;u.uClimate[3]=w.temp;
  climate.updatePlants();
  surfaceMotion.update(sim.time,sim.fish,climate,w);
  for(let i=0;i<6;i++){const p=surfaceMotion.records[i],values=u['uWake'+i];values[0]=p.x;values[1]=p.y;values[2]=p.created;values[3]=p.strength;}
@@ -190,7 +201,7 @@ function updateVisuals(updateAnimals=true){
  for(let i=0;i<5;i++){
    const a=sim.attractors[i],values=u['uRipple'+i];values[0]=a?.x||0;values[1]=a?.y||0;values[2]=a?a.created:-100;values[3]=a?1:0;
  }
- for(const p of pollen){const x=((p.x+sim.time*(1.6+w.windX*6))%WORLD.width+WORLD.width)%WORLD.width,y=p.y+Math.sin(sim.time*.18+p.phase)*7+Math.sin(sim.time*.07+p.phase)*w.windY*6;p.sprite.position.set(x,y);p.sprite.visible=isWater(x,y);}
+ for(const p of pollen){const x=((p.x+sim.time*(1.6+w.windX*6))%WORLD.width+WORLD.width)%WORLD.width,y=p.y+Math.sin(sim.time*.18+p.phase)*7+Math.sin(sim.time*.07+p.phase)*w.windY*6;p.sprite.position.set(x,y);p.sprite.visible=!climate.seasonWinter&&isWater(x,y);}
 }
 app.ticker.maxFPS=wallpaper.fps;
 app.ticker.add(t=>{
@@ -269,6 +280,7 @@ updateVisuals();ready=true;document.querySelector('#loading').classList.add('don
 window.__pond={get ready(){return ready},get renderer(){return app.renderer.name},get paused(){return paused},get frames(){return frames},get lastClick(){return lastClick},snapshot:()=>sim.snapshot(),weather:()=>({source:weather.source,preset:weather.preset,current:{...weather.current},target:{...weather.target},timeMode:weather.timeMode}),growth:()=>growth.snapshot(),sky:()=>structuredClone(sky),climate:()=>climate.snapshot(),wildlife:()=>life.snapshot(),butterflies:()=>shore.butterflies.map(b=>({x:b.x,y:b.y,state:b.state,height:b.height,visible:b.sprite.visible})),precipitation:()=>({rain:structuredClone(atmosphere.frame.rain),impacts:structuredClone(atmosphere.frame.impacts),snow:structuredClone(atmosphere.frame.snow),shaderImpacts:structuredClone(atmosphere.frame.shaderImpacts)}),performance:()=>({...budget.snapshot(),resolution:app.renderer.resolution,drawPixels:app.canvas.width*app.canvas.height}),viewport:()=>({x:world.x,y:world.y,width:WORLD.width*world.scale.x,height:WORLD.height*world.scale.y,scaleX:world.scale.x,scaleY:world.scale.y,windowWidth:innerWidth,windowHeight:innerHeight}),waterAt:(x,y)=>isWater(x,y),surfaceAt:(x,y)=>climate.surfaceAt(x,y)};
 window.__pond.shoreLife=()=>shore.snapshot();
 window.__pond.plantsDisplay=()=>lotus.snapshot();
+window.__pond.winterScene=()=>({active:shownWinter,remnants:winterRemnants.visible,probes:[[260,260],[400,180],[1450,260],[1320,750],[650,355],[1000,500]].map(([x,y])=>({x,y,ice:climate.iceAt(x,y),surface:climate.surfaceAt(x,y)})),fishAlpha:visuals.map(v=>v.mesh.alpha)});
 window.__pond.appearance=()=>appearance.snapshot();
 window.__pond.seasons=()=>seasons.snapshot();
 window.__pond.precipitationBudget=()=>({season:atmosphere.frame.season,rainBudget:atmosphere.frame.rainBudget,rainCount:atmosphere.frame.rainCount,snowCount:atmosphere.frame.snowCount,drawnRain:atmosphere.rain.particleChildren.length,drawnSnow:atmosphere.snow.particleChildren.length,rings:atmosphere.frame.impacts.length});

@@ -103,27 +103,31 @@ vec3 rainRipple(vec2 p,vec4 r) {
 void main() {
   vec2 uv=vTextureCoord;vec2 screenUV=uv*uInputSize.xy/uOutputFrame.zw;vec2 world=screenUV*uWorld+uOrigin;
   vec2 localWorld=world;
-  vec3 terrain=texture(uTerrain,clamp(localWorld/vec2(1672.,941.),0.,1.)).rgb;
+  vec4 terrain=texture(uTerrain,clamp(localWorld/vec2(1672.,941.),0.,1.));
   float leaves=max(max(max(leafMask(localWorld,uLeaf0),leafMask(localWorld,uLeaf1)),max(leafMask(localWorld,uLeaf2),leafMask(localWorld,uLeaf3))),max(max(leafMask(localWorld,uLeaf4),leafMask(localWorld,uLeaf5)),max(leafMask(localWorld,uLeaf6),leafMask(localWorld,uLeaf7))));
-  float wet=terrain.r*(1.-leaves);
+  float wet=mix(terrain.r,terrain.g,uWinter)*(1.-leaves);
   float grain=noise(localWorld*.021);
-  // Restrained frost grows inward from four image corners, never a closed ring.
-  vec2 corner=min(localWorld,vec2(1672.,941.)-localWorld);
-  float cornerDistance=corner.x/(300.+uClimate.x*300.)+corner.y/(190.+uClimate.x*190.);
-  float ice=(1.-smoothstep(.75+grain*.12,1.08+grain*.10,cornerDistance))*smoothstep(.01,.3,uClimate.x);
+  // Static terrain alpha is shared with click, rain and animal surface checks.
+  float ice=terrain.a*uClimate.x*wet;
   float t=uTime;
   vec2 flow=vec2(sin(world.y*.011+t*.42)+sin(world.y*.024-world.x*.008-t*.23),cos(world.x*.01+t*.36)+sin(world.y*.013+world.x*.009+t*.31));
   vec3 rp=ripple(world,uRipple0)+ripple(world,uRipple1)+ripple(world,uRipple2)+ripple(world,uRipple3)+ripple(world,uRipple4);
   rp+=wake(world,uWake0)+wake(world,uWake1)+wake(world,uWake2)+wake(world,uWake3)+wake(world,uWake4)+wake(world,uWake5);
   rp+=rainRipple(world,uRainImpact0)+rainRipple(world,uRainImpact1)+rainRipple(world,uRainImpact2)+rainRipple(world,uRainImpact3)+rainRipple(world,uRainImpact4)+rainRipple(world,uRainImpact5)+rainRipple(world,uRainImpact6)+rainRipple(world,uRainImpact7)+rainRipple(world,uRainImpact8)+rainRipple(world,uRainImpact9)+rainRipple(world,uRainImpact10)+rainRipple(world,uRainImpact11)+rainRipple(world,uRainImpact12)+rainRipple(world,uRainImpact13)+rainRipple(world,uRainImpact14)+rainRipple(world,uRainImpact15);
   float gust=sin(dot(world,uWind+vec2(.2,.1))*.045-t*(.9+uWeather.z));
-  float movement=wet*(1.-ice*.94);
+  float movement=wet*(1.-smoothstep(.12,.3,ice))*(1.-uWinter*.55);
   vec2 shift=(flow*(.65+uWeather.z*.8)+uWind*gust*.9+rp.xy)*uInputSize.zw*movement;
   vec4 color=texture(uTexture,clamp(uv+shift,uInputClamp.xy,uInputClamp.zw));
+  if(ice>.12){
+    vec2 blur=uInputSize.zw*(1.+ice*3.);
+    vec3 below=(texture(uTexture,clamp(uv+blur,uInputClamp.xy,uInputClamp.zw)).rgb+texture(uTexture,clamp(uv-blur,uInputClamp.xy,uInputClamp.zw)).rgb)*.5;
+    color.rgb=mix(color.rgb,below,ice*.65);
+  }
   float depth=terrain.b;
   vec3 shallow=color.rgb*vec3(1.025,1.012,.96);
   vec3 deep=color.rgb*vec3(.63,.79,.85)+vec3(.005,.018,.024);
   color.rgb=mix(color.rgb,mix(shallow,deep,depth),wet);
+  color.rgb=mix(color.rgb,color.rgb*vec3(.82,.94,1.06),uWinter*wet*.6);
   // Two smooth spatial scales bend the light network into flowing curves.
   vec2 w=localWorld/192.;
   w+=vec2(sin(w.y*2.2+t*.19)+sin(w.x*1.6-w.y+t*.11),cos(w.x*2.1-t*.15)+sin(w.y*1.7+w.x-t*.13))*.36;
@@ -145,13 +149,6 @@ void main() {
   color.rgb*=.96+.04*vignette;
   color.rgb*=mix(vec3(.24,.41,.50),vec3(1.),uWeather.y)*(1.-uWeather.x*.19);
   color.rgb=mix(color.rgb,color.rgb*vec3(.87,.96,1.08),uWeather.w*.4);
-  // Reuse the cached foreground mask inside this pass; only foliage loses green.
-  if(uWinter>.5){
-    vec4 surface=texture(uSurface,clamp(localWorld/vec2(1672.,941.),0.,1.));
-    float foliage=surface.a*smoothstep(.015,.09,surface.g-surface.b)*smoothstep(-.02,.035,surface.g-surface.r);
-    float shade=dot(color.rgb,vec3(.25,.6,.15));
-    color.rgb=mix(color.rgb,vec3(.89,.73,.49)*shade,foliage*.94);
-  }
   // Small sunlight facets sparkle as surface normals turn toward the sun.
   // Cloud/rain dim the glints; the broader caustics above remain underwater.
   vec2 sunDelta=world-uSun.xy;
@@ -179,12 +176,16 @@ void main() {
   float moonLight=(path*fragments*.48+center*(.025+fragments*.20)*(.35+reference*.65)+halo)*uMoon.w*nightVisibility;
   color.rgb+=vec3(.82,.89,.91)*moonLight*movement;
   // Thin translucent ice retains some bottom detail and subdued light below it.
-  float crystal=pow(1.-abs(sin(localWorld.x*.061+sin(localWorld.y*.043)*2.+sin((localWorld.x+localWorld.y)*.037))),14.);
-  float frost=pow(grain,2.6)*.09+crystal*.14;
-  color.rgb=mix(color.rgb,vec3(.71,.80,.80)*( .62+.38*uWeather.y)+frost,ice*(.17+crystal*.20));
-  float ground=max(terrain.g,leaves);
+  float cloud=noise(localWorld*.013+vec2(23.,8.));
+  float vein=abs(sin(localWorld.x*.018+localWorld.y*.027+noise(localWorld*.024)*3.));
+  float crack=(1.-smoothstep(.006,.024,vein))*smoothstep(.55,.76,noise(localWorld*.009+19.));
+  float frost=pow(noise(localWorld*.045),5.)*.07+pow(noise(localWorld*.19),7.)*.015;
+  vec3 iceColor=vec3(.65,.76,.79)*(.32+.68*uWeather.y);
+  color.rgb=mix(color.rgb,iceColor,ice*(.55+cloud*.3));
+  color.rgb+=vec3(.73,.84,.87)*(frost+crack*.14)*ice*(.25+.75*uWeather.y);
+  float ground=1.-wet;
   float settled=ground*uClimate.y*(.08+.34*pow(noise(localWorld*.075),2.));
-  settled+=ice*uClimate.y*pow(grain,3.)*.13;
+  settled+=ice*max(uClimate.y,uWinter*.22)*pow(grain,3.)*.32;
   color.rgb=mix(color.rgb,vec3(.82,.86,.83)*(.48+.52*uWeather.y),clamp(settled,0.,.78));
   finalColor=vec4(color.rgb,color.a);
 }`;

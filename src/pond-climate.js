@@ -1,12 +1,13 @@
-import { Texture } from 'pixi.js';
+import { Texture, BufferImageSource } from 'pixi.js';
 import { isOpenWater, isPad, isWater, shoreDistance } from './pond-surface.js';
 import { lotusAppearance } from './lotus-growth.js';
 import { waterDepth } from './pond-layout.js';
+import { remnantAt } from './winter-scene.js';
 
 const clamp=(n,a=0,b=1)=>Math.max(a,Math.min(b,n));
 const WORLD_WIDTH=1672,WORLD_HEIGHT=941;
 
-/** R: moving water, G: snow-catching ground, B: normalized visual depth. */
+/** R: summer water, G: winter water, B: depth, A: cached shallow-ice footprint. */
 function terrainTexture() {
   const canvas=document.createElement('canvas');canvas.width=418;canvas.height=236;
   const context=canvas.getContext('2d'),pixels=context.createImageData(canvas.width,canvas.height),near={};
@@ -15,17 +16,25 @@ function terrainTexture() {
     const distance=shoreDistance(wx,wy,near).distance,water=isOpenWater(wx,wy);
     const k=(y*canvas.width+x)*4;
     pixels.data[k]=water?Math.round(clamp(distance/4)*255):0;
-    pixels.data[k+1]=water?0:255;
+    const winterWater=isWater(wx,wy)&&!remnantAt(wx,wy);
+    pixels.data[k+1]=winterWater?Math.round(clamp(distance/4)*255):0;
     pixels.data[k+2]=Math.round(waterDepth(wx,wy,distance)*255);
-    pixels.data[k+3]=255;
+    const lobe=(cx,cy)=>Math.exp(-(((wx-cx)/310)**2+((wy-cy)/245)**2));
+    const corner=clamp((Math.max(lobe(195,165),lobe(1460,200),lobe(335,785),lobe(1340,790))-.18)/.68);
+    const broken=.7+.22*Math.sin(wx*.017+wy*.013)+.14*Math.sin(wy*.036-wx*.009);
+    const jagged=12*Math.sin(wx*.047+Math.sin(wy*.029)*2)+8*Math.sin(wy*.065+wx*.024);
+    const edge=clamp((135+corner*100+jagged-distance)/30);
+    const depth=waterDepth(wx,wy,distance);
+    pixels.data[k+3]=Math.round(255*(winterWater?clamp(distance/42)*edge*clamp(corner*broken*1.9)*clamp((.64-depth)/.22):0));
   }
-  context.putImageData(pixels,0,0);
-  return Texture.from(canvas);
+  // Upload data directly: a canvas would lose RGB precision where ice alpha is zero.
+  const texture=new Texture({source:new BufferImageSource({resource:new Uint8Array(pixels.data.buffer),width:canvas.width,height:canvas.height,format:'rgba8unorm',alphaMode:'no-premultiply-alpha',scaleMode:'linear'})});
+  return {texture,data:pixels.data,width:canvas.width,height:canvas.height};
 }
 
 export class PondClimate {
   constructor(plants) {
-    this.texture=terrainTexture();this.freeze=0;this.snowCover=0;this.waterTemp=20;this.airTemp=20;
+    this.terrain=terrainTexture();this.texture=this.terrain.texture;this.freeze=0;this.snowCover=0;this.waterTemp=20;this.airTemp=20;this.seasonWinter=false;
     this.plants=plants;this.leaves=Array.from({length:8},()=>({x:0,y:0,radius:0}));
     this.near={};this.updatePlants();
   }
@@ -33,7 +42,7 @@ export class PondClimate {
     for(let i=0;i<this.leaves.length;i++) {
       const p=this.plants[i],leaf=this.leaves[i];
       leaf.x=p?.x||0;leaf.y=p?.y||0;
-      leaf.radius=p&&p.age>=0?36*lotusAppearance(p.age).leafScale:0;
+      leaf.radius=!this.seasonWinter&&p&&p.age>=0?36*lotusAppearance(p.age).leafScale:0;
     }
   }
   step(dt,weather,source) {
@@ -53,17 +62,23 @@ export class PondClimate {
     return false;
   }
   iceAt(x,y) {
-    if(this.freeze<.02||!isOpenWater(x,y)||this.plantAt(x,y))return 0;
-    const cornerX=Math.min(x,WORLD_WIDTH-x),cornerY=Math.min(y,WORLD_HEIGHT-y);
-    const distance=cornerX/(300+this.freeze*300)+cornerY/(190+this.freeze*190);
-    return clamp((.95-distance)/.24)*this.freeze;
+    if(this.iceLevel<.02||!isWater(x,y)||this.plantAt(x,y)||(!this.seasonWinter&&isPad(x,y))||this.seasonWinter&&remnantAt(x,y))return 0;
+    const {data,width,height}=this.terrain;
+    const px=clamp(x/WORLD_WIDTH*width-.5,0,width-1),py=clamp(y/WORLD_HEIGHT*height-.5,0,height-1);
+    const ix=Math.floor(px),iy=Math.floor(py),fx=px-ix,fy=py-iy;
+    const sample=(a,b)=>data[(b*width+a)*4+3]/255;
+    const a=sample(ix,iy)*(1-fx)+sample(Math.min(ix+1,width-1),iy)*fx;
+    const b=sample(ix,Math.min(iy+1,height-1))*(1-fx)+sample(Math.min(ix+1,width-1),Math.min(iy+1,height-1))*fx;
+    return (a*(1-fy)+b*fy)*this.iceLevel;
   }
   surfaceAt(x,y) {
-    if(this.plantAt(x,y)||isPad(x,y))return 'leaf';
+    if(this.seasonWinter?remnantAt(x,y):this.plantAt(x,y)||isPad(x,y))return 'leaf';
     if(!isWater(x,y))return 'ground';
     return this.iceAt(x,y)>.3?'ice':'water';
   }
+  // The chosen winter scene is an artistic half-frozen preset, not measured ice.
+  get iceLevel(){return this.seasonWinter?Math.max(.88,this.freeze):this.freeze;}
   get winter(){return this.freeze>.025||this.airTemp<6;}
-  get winterAmount(){return Math.max(clamp((6-this.airTemp)/7),clamp(this.freeze*4));}
-  snapshot(){return {freeze:this.freeze,snowCover:this.snowCover,waterTemp:this.waterTemp,winter:this.winter,winterAmount:this.winterAmount};}
+  get winterAmount(){return Math.max(this.seasonWinter?1:0,clamp((6-this.airTemp)/7),clamp(this.freeze*4));}
+  snapshot(){return {freeze:this.freeze,iceLevel:this.iceLevel,seasonWinter:this.seasonWinter,snowCover:this.snowCover,waterTemp:this.waterTemp,winter:this.winter,winterAmount:this.winterAmount};}
 }

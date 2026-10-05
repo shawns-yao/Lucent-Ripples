@@ -42,7 +42,7 @@ export class PondSimulation {
     f.motionState=state;
     if(state==='rest') {
       f.paceMultiplier=0;f.speed=0;f.vx=0;f.vy=0;f.turn=0;f.restCount++;
-      f.motionUntil=this.time+FISH_MOTION.minRest+r()*(FISH_MOTION.maxRest-FISH_MOTION.minRest);
+      f.motionUntil=this.time+(FISH_MOTION.minRest+r()*(FISH_MOTION.maxRest-FISH_MOTION.minRest))*(this.surface?.seasonWinter?3:1);
     } else if(state==='settling') {
       // Decelerate all the way to zero before starting the rest clock.
       f.paceMultiplier=0;f.motionUntil=null;
@@ -67,7 +67,9 @@ export class PondSimulation {
     } else if(f.motionState!=='settling') {
       if(!interested&&this.time>=f.nextRestAt){
         f.refuge=null;
-        if(!f.schooling&&f.id%3===0){
+        if(this.surface?.seasonWinter){
+          f.refuge={x:QUIET_WATER.x+Math.cos(f.phase)*160,y:QUIET_WATER.y+Math.sin(f.phase)*110};
+        }else if(!f.schooling&&f.id%3===0){
           let nearest=260;
           for(const [x,y,rx,ry] of STATIC_PADS){
             const angle=Math.atan2(f.y-y,f.x-x),px=x+Math.cos(angle)*(rx+20),py=y+Math.sin(angle)*(ry+20),d=Math.hypot(px-f.x,py-f.y);
@@ -78,12 +80,12 @@ export class PondSimulation {
       }
       else if(this.time>=f.motionUntil) {
         const choice=f.motionRandom();
-        this.setMotion(f,choice<.55?'cruise':choice<.82?'glide':'burst');
+        this.setMotion(f,this.surface?.seasonWinter?(choice<.3?'cruise':'glide'):choice<.55?'cruise':choice<.82?'glide':'burst');
       }
     }
   }
   attract(x,y) {
-    if(!isOpenWater(x,y,2)||this.surface?.surfaceAt(x,y)!=='water'&&this.surface)return {selected:0,x,y,accepted:false};
+    if(this.surface?(!isWater(x,y,2)||this.surface.surfaceAt(x,y)!=='water'):!isOpenWater(x,y,2))return {selected:0,x,y,accepted:false};
     const point={x,y,created:this.time,id:++this.clicks,life:14};
     this.attractors.push(point); if(this.attractors.length>5) this.attractors.shift();
     const candidates=this.fish.map(f=>({f,d:Math.hypot(f.x-x,f.y-y)})).filter(v=>v.d<420).sort((a,b)=>a.d-b.d);
@@ -114,9 +116,10 @@ export class PondSimulation {
       const f=this.fish[i], p=old[i];
       const boundary=shoreDistance(f.x,f.y,this.boundaryHint);
       f.waterDepth=waterDepth(f.x,f.y,boundary.distance);
-      const submerged=f.waterDepth*(.3+f.depth*.4+.08*Math.sin(this.time*.13+f.phase));
+      const winter=this.surface?.seasonWinter;
+      const submerged=f.waterDepth*(winter?.82+f.depth*.14:.3+f.depth*.4+.08*Math.sin(this.time*.13+f.phase));
       f.submergence+=(submerged-f.submergence)*Math.min(1,dt*.7);
-      if(f.target && (this.time>f.leaveAt||this.time-f.target.created>f.target.life)) f.target=null;
+      if(f.target && (this.time>f.leaveAt||this.time-f.target.created>f.target.life||this.surface&&this.surface.surfaceAt(f.target.x,f.target.y)!=='water')) f.target=null;
       const interested=Boolean(f.target&&this.time>=f.reactionTime);
       this.updateMotion(f,interested);
       if(f.motionState==='rest') {
@@ -141,20 +144,21 @@ export class PondSimulation {
       }
       fx+=sx*2.2;fy+=sy*2.2;
       if(neighbors>0){fx+=ax/neighbors*.76*f.sociability+cx/neighbors*.0038;fy+=ay/neighbors*.76*f.sociability+cy/neighbors*.0038;}
-      const warmth=weather?clamp((weather.temp+2)/22,.35,1):1;
+      const warmth=(weather?clamp((weather.temp+2)/22,.35,1):1)*(winter?.65:1);
       let preferred=f.baseSpeed*f.paceMultiplier*(.96+.04*Math.sin(this.time*.6+f.phase))*warmth;
       if(!interested){
         const home=HABITATS[f.group%HABITATS.length],phase=this.time*.085+f.group*2.4;
-        const transit=f.schooling&&(this.time+f.group*19)%160<13;
+        const transit=!winter&&f.schooling&&(this.time+f.group*19)%160<13;
         let tx=home[0]+Math.cos(phase)*100,ty=home[1]+Math.sin(phase*.83)*65;
         if(transit){tx=f.group%2?430:980;ty=340+Math.sin(f.group)*65;}
         tx+=Math.cos(f.phase)*48;ty+=Math.sin(f.phase)*36;
+        if(winter){tx=QUIET_WATER.x+Math.cos(f.phase)*180;ty=QUIET_WATER.y+Math.sin(f.phase)*120;}
         if(f.motionState==='seeking'){tx=f.refuge.x;ty=f.refuge.y;}
         const dx=tx-f.x,dy=ty-f.y,d=Math.hypot(dx,dy)||1;
         const pull=f.motionState==='seeking'?2.3:Math.min(1.5,d/130)*(f.schooling?1.25:.45);
         fx+=dx/d*pull;fy+=dy/d*pull;
         const qx=(f.x-QUIET_WATER.x)/QUIET_WATER.rx,qy=(f.y-QUIET_WATER.y)/QUIET_WATER.ry,q=qx*qx+qy*qy;
-        if(!transit&&q<1){fx+=qx*(1-q)*1.8;fy+=qy*(1-q)*1.8;}
+        if(!winter&&!transit&&q<1){fx+=qx*(1-q)*1.8;fy+=qy*(1-q)*1.8;}
       }
       if(interested) {
         // Independent offset and arrival steering prevent a single rotating knot.

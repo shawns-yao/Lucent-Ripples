@@ -22,7 +22,7 @@ export class SurfaceMotion {
     }
     if(time>=this.nextLeaf){
       this.nextLeaf=time+3.6;
-      if(weather.wind<.7||climate.winter)return;
+      if(weather.wind<.7||climate.winter||climate.seasonWinter)return;
       const index=this.leafCursor++%(STATIC_PADS.length+climate.leaves.length);
       const leaf=index<STATIC_PADS.length?STATIC_PADS[index]:null,p=climate.leaves[index-STATIC_PADS.length];
       const x=leaf?leaf[0]:p.x,y=leaf?leaf[1]:p.y,rx=leaf?leaf[2]:p.radius,ry=leaf?leaf[3]:p.radius;

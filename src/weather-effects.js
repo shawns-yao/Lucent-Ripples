@@ -119,8 +119,10 @@ export class LotusVisuals {
   update(time,weather,season='summer'){
     const changed=this.season!==season;this.season=season;const dormant=season==='winter';
     if(changed)this.companionLayer.filters=dormant?[this.winterFilter]:null;
+    this.companionLayer.visible=!dormant;
+    for(const {shadow} of this.companions)shadow.visible=!dormant;
     const blossoms=[0,0];
-    this.growth.plants.forEach((p,i)=>{const v=this.plants[i],{visible,leafScale:size,leafStage,bloomStage,bloomScale}=lotusAppearance(p.age);v.group.visible=visible;
+    this.growth.plants.forEach((p,i)=>{const v=this.plants[i],{visible,leafScale:size,leafStage,bloomStage,bloomScale}=lotusAppearance(p.age);v.group.visible=visible&&!dormant;
       v.group.x=p.x+Math.sin(time*.6+p.phase)*weather.wind*.26;v.group.y=p.y+Math.cos(time*.5+p.phase)*weather.wind*.15;
       v.leaves.rotation=Math.sin(time*.48+p.phase)*(.012+weather.wind*.003);v.leaves.scale.set((82/this.textures[0].width)*size);
       if(changed)v.leaves.filters=dormant?[this.winterFilter]:null;
@@ -130,7 +132,7 @@ export class LotusVisuals {
       v.leafSprites.forEach((s,n)=>{s.alpha=Math.max(0,1-Math.abs(leafStage-n));});
       v.flower.position.set(12,-14);v.flower.scale.set((49/this.textures[3].width)*bloomScale);v.flower.rotation=Math.sin(time*.7+p.phase)*weather.wind*.002;
       v.blooms.forEach((s,n)=>s.alpha=Math.max(0,1-Math.abs(bloomStage-n)));
-      v.shadow.texture=this.textures[Math.round(leafStage)];v.shadow.visible=visible;v.shadow.position.set(v.group.x+5,v.group.y+7);v.shadow.scale.set(v.leaves.scale.x*1.04);v.shadow.rotation=v.leaves.rotation;
+      v.shadow.texture=this.textures[Math.round(leafStage)];v.shadow.visible=visible&&!dormant;v.shadow.position.set(v.group.x+5,v.group.y+7);v.shadow.scale.set(v.leaves.scale.x*1.04);v.shadow.rotation=v.leaves.rotation;
       v.flowerShadow.texture=this.textures[3+Math.round(bloomStage)];v.flowerShadow.visible=visible&&v.flower.visible;v.flowerShadow.position.set(v.group.x+18,v.group.y+5);v.flowerShadow.scale.set(v.flower.scale.x*1.08);
       const site=this.flowerSites[i];site.x=v.group.x+12;site.y=v.group.y;site.available=v.flower.visible&&visible&&bloomScale>.7&&bloomStage>.7;
     });

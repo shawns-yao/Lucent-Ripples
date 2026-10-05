@@ -125,7 +125,7 @@ export class PondLife {
   }
   update(time,weather) {
     const dt=clamp(time-this.lastTime,0,.1);this.lastTime=time;
-    const warm=clamp((weather.temp-3)/11),light=.42+.58*weather.light;
+    const warm=this.climate.seasonWinter?0:clamp((weather.temp-3)/11),light=.42+.58*weather.light;
     for(const c of this.crabs) {
       if(time>=c.until) {
         if(c.state==='walk'){c.state='rest';c.until=time+3+this.random()*8;}

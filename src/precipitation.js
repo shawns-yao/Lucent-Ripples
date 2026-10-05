@@ -52,7 +52,7 @@ export function precipitationFrame(time,weather,plants=[],frame=null,climate=nul
   for(let i=0;i<count;i++){
     const p=rainParticle(PRECIPITATION_PARTICLES[i],time,weather,frame?.rainPool[i],profile);
     if(p.airborne)rain.push(p);
-    else if(p.onWater&&p.impactAge<1.05){
+    else if((p.onWater||climate?.seasonWinter)&&p.impactAge<1.05){
       const ring=p.id%impactStride===0&&impacts.length<240,refract=p.id%37===0&&shaderImpacts.length<16;
       if((ring||refract)&&(climate?climate.surfaceAt(p.x,p.y)==='water':!plants.some(plant=>plant.age>=0&&Math.hypot(plant.x-p.x,plant.y-p.y)<46))){
         if(ring)impacts.push(p);if(refract)shaderImpacts.push(p);
