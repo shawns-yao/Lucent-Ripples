@@ -14,6 +14,7 @@ import { setupTreeSeasons } from './tree-seasons.js';
 import { LOTUS_STORAGE_KEY } from './lotus-growth.js';
 import { celestialAt } from './celestial.js';
 import { wallpaper } from './wallpaper.js';
+import { setupWallpaperPanel } from './wallpaper-panel.js';
 import { SurfaceMotion } from './surface-motion.js';
 import { PondVegetation } from './pond-vegetation.js';
 import { PondEcology } from './pond-ecology.js';
@@ -283,6 +284,7 @@ wallpaper.attach({
  },
  playback:syncPlayback,
 });
+setupWallpaperPanel();
 updateVisuals();ready=true;document.querySelector('#loading').classList.add('done');setTimeout(()=>document.querySelector('#loading')?.remove(),1200);setTimeout(()=>document.querySelector('#hint').classList.add('quiet'),9000);
 // Small deterministic observation API for verification and reproducible captures.
 window.__pond={get ready(){return ready},get renderer(){return app.renderer.name},get paused(){return paused},get frames(){return frames},get lastClick(){return lastClick},snapshot:()=>sim.snapshot(),weather:()=>({source:weather.source,preset:weather.preset,current:{...weather.current},target:{...weather.target},timeMode:weather.timeMode}),growth:()=>growth.snapshot(),sky:()=>structuredClone(sky),climate:()=>climate.snapshot(),wildlife:()=>life.snapshot(),butterflies:()=>shore.butterflies.map(b=>({x:b.x,y:b.y,state:b.state,height:b.height,visible:b.sprite.visible})),precipitation:()=>({rain:structuredClone(atmosphere.frame.rain),impacts:structuredClone(atmosphere.frame.impacts),snow:structuredClone(atmosphere.frame.snow),shaderImpacts:structuredClone(atmosphere.frame.shaderImpacts)}),performance:()=>({...budget.snapshot(),resolution:app.renderer.resolution,drawPixels:app.canvas.width*app.canvas.height}),viewport:()=>({x:world.x,y:world.y,width:WORLD.width*world.scale.x,height:WORLD.height*world.scale.y,scaleX:world.scale.x,scaleY:world.scale.y,windowWidth:innerWidth,windowHeight:innerHeight}),waterAt:(x,y)=>isWater(x,y),surfaceAt:(x,y)=>climate.surfaceAt(x,y)};

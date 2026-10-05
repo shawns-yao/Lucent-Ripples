@@ -9,6 +9,7 @@ const choices = {
   clarity: ['balanced', 'high'],
 };
 let hostFPS = 0, hostPaused = false, adapter = null;
+const listeners = new Set();
 
 export const wallpaper = {
   enabled,
@@ -19,6 +20,8 @@ export const wallpaper = {
   get fishDensity() { return enabled ? options.fishdensity / 100 : 1; },
   get effectStrength() { return !enabled || options.effects === 'high' ? 1 : options.effects === 'medium' ? .65 : .35; },
   get pixelBudget() { return !enabled || options.clarity === 'high' ? 2560 * 1440 : 2600000; },
+  setProperties: applyProperties,
+  subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
   attach(callbacks) {
     if (!enabled) return;
     adapter = callbacks;
@@ -28,11 +31,7 @@ export const wallpaper = {
   snapshot: () => ({ enabled, ...options, hostFPS, effectiveFPS: wallpaper.fps, hostPaused }),
 };
 
-if (enabled) {
-  document.documentElement.dataset.wallpaper = 'true';
-  // Register before asynchronous texture loading so startup settings are retained.
-  window.wallpaperPropertyListener = {
-    applyUserProperties(properties) {
+function applyProperties(properties) {
       const changed = {};
       for (const key of Object.keys(options)) {
         const property = properties['pond' + key];
@@ -50,7 +49,14 @@ if (enabled) {
         if (options[key] !== value) { options[key] = value; changed[key] = value; }
       }
       if (Object.keys(changed).length) adapter?.apply(changed);
-    },
+      if (Object.keys(changed).length) listeners.forEach(listener => listener());
+}
+
+if (enabled) {
+  document.documentElement.dataset.wallpaper = 'true';
+  // Register before asynchronous texture loading so startup settings are retained.
+  window.wallpaperPropertyListener = {
+    applyUserProperties: applyProperties,
     applyGeneralProperties(properties) {
       if (!Object.hasOwn(properties, 'fps')) return;
       const fps = Number(properties.fps);

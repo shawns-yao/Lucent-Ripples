@@ -1,4 +1,5 @@
 import { roundCoordinates } from './weather.js';
+import { setupSceneClock } from './scene-clock.js';
 
 const REFRESH_MS = 10 * 60 * 1000;
 const API_ERRORS = {
@@ -20,6 +21,7 @@ const locationLabel = (city) => uniqueNames([city.admin2 || city.admin1, city.na
 export function setupWeatherUI(weather, growth, onChange = () => {}) {
   const status = document.querySelector('#weather-status');
   const summary = document.querySelector('#weather-summary');
+  const clock = setupSceneClock(summary);
   const buttons = [...document.querySelectorAll('[data-weather]')];
   const cityForm = document.querySelector('#city-form');
   const results = document.querySelector('#city-results');
@@ -36,7 +38,7 @@ export function setupWeatherUI(weather, growth, onChange = () => {}) {
   const setStatus = (text) => { status.textContent = text; };
   const setSearching = (busy) => cityForm.setAttribute('aria-busy', String(busy));
   const updateSummary = () => {
-    summary.textContent = `${weather.target.label} · ${weather.source === 'live' ? '当地天气' : '演示'}`;
+    clock.setWeather(`${weather.target.label} · ${weather.source === 'live' ? '当地天气' : '演示'}`);
     buttons.forEach((button) => {
       button.setAttribute('aria-pressed', String(button.dataset.weather === weather.preset));
       button.disabled = button.dataset.weather === 'snow' && weather.season !== 'winter';
@@ -251,6 +253,6 @@ export function setupWeatherUI(weather, growth, onChange = () => {}) {
     setTime,
     refreshSummary: updateSummary,
     get locationActive() { return Boolean(activeLocation); },
-    destroy: () => { cancel(); activeLocation = null; listeners.forEach((remove) => remove()); },
+    destroy: () => { cancel(); clock.destroy(); activeLocation = null; listeners.forEach((remove) => remove()); },
   };
 }

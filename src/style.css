@@ -1,6 +1,23 @@
 canvas:focus-visible{outline:2px solid #edf1c4;outline-offset:-4px}
+/* The clock stays useful on the desktop; settings only expand on demand. */
+:root #weather-summary{display:grid;grid-template-columns:1fr auto;gap:5px 14px;width:194px;padding:14px 17px;border-radius:14px;letter-spacing:0;background:#183d35d9;box-shadow:0 5px 22px #102d2520}
+:root #weather-summary:before{display:none}
+#scene-clock{grid-column:1/-1;font:400 36px/1.05 "Segoe UI",system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.02em;color:#f5f2df}
+.clock-date{grid-column:1/-1;color:#d3dece;font-size:11px;line-height:1.6}
+.clock-weather{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;margin-top:5px;padding-top:9px;border-top:1px solid #d7e1ce24;font-size:11px;color:#e4e8d7}
+.clock-weather:after{content:"";width:6px;height:6px;border-right:1px solid currentColor;border-bottom:1px solid currentColor;transform:rotate(45deg);margin-right:2px;margin-top:-3px}
+#weather-panel[open] .clock-weather:after{transform:rotate(225deg);margin-top:3px}
+:root #weather-panel[open] #weather-summary{width:100%}
+:root .weather-content{max-height:calc(100dvh - 190px)}
+.wallpaper-settings{display:grid;gap:12px;margin:16px 0;padding-top:15px;border-top:1px solid #dae5c91a}
+.wallpaper-settings label{display:grid;gap:7px;color:#d5ddc7}
+.wallpaper-settings select{width:100%;min-height:36px;border:1px solid #dce7c83d;border-radius:6px;padding:7px;background:#214b40;color:#eeeeda;font:inherit}
+.wallpaper-settings input[type=range]{width:100%;accent-color:#bdce99}
+#weather-panel select:focus-visible{outline:2px solid #edf1c4;outline-offset:3px}
+@media(max-width:700px) and (orientation:portrait){:root #weather-summary{width:172px;padding:12px 14px}#scene-clock{font-size:31px}:root .weather-content{max-height:calc(100dvh - 176px)}}
 #weather-panel button[data-weather=snow]:disabled{cursor:not-allowed}
-html[data-wallpaper=true] #weather-panel,html[data-wallpaper=true] #hint,html[data-wallpaper=true] .controls,html[data-wallpaper=true] #loading p{display:none!important}
+html[data-wallpaper=true] #hint,html[data-wallpaper=true] .controls,html[data-wallpaper=true] #loading p{display:none!important}
+html[data-wallpaper=true] .local-weather,html[data-wallpaper=true] .growth-controls{display:none}
 .appearance-controls{margin:15px 0 0;padding-top:13px;border-top:1px solid #dae5c91a}.appearance-controls>p{margin:0 0 8px;color:#d5ddc7;font-size:10px}#appearance-options{display:flex;gap:6px}#weather-panel #appearance-options button{flex:1;min-height:36px}#weather-panel #appearance-options button[aria-pressed=true]{background:#d4dda434;color:#ffffd5;border-color:#e4ecad6b}#style-status{margin:8px 0 0;font-size:10px;line-height:1.6}
 .season-controls{margin-top:12px}.season-controls>p{margin:0 0 8px;color:#d5ddc7;font-size:10px}#season-options{display:grid;grid-template-columns:1.5fr repeat(4,1fr);gap:4px}#weather-panel #season-options button{padding:8px 0;min-height:36px}#weather-panel #season-options button[aria-pressed=true]{background:#d4dda434;color:#ffffd5;border-color:#e4ecad6b}.season-controls>.season-status{margin:7px 0 0;color:#e1e7cbb8;font-size:10px}@media(max-width:700px) and (orientation:portrait){#weather-panel #season-options button{min-height:44px}}
 @media(max-width:700px) and (orientation:portrait){:root #weather-panel{top:max(14px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right));max-width:calc(100vw - 28px)}:root .controls{bottom:max(14px,env(safe-area-inset-bottom));right:max(14px,env(safe-area-inset-right));opacity:.8}:root .controls button{width:44px;height:44px;background:#173e3459}:root #hint{bottom:max(22px,env(safe-area-inset-bottom));left:16px;right:116px;font-size:10px;line-height:1.8;letter-spacing:0}#weather-panel #appearance-options button{min-height:44px}}
