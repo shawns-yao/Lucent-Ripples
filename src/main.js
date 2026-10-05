@@ -56,7 +56,7 @@ const visuals=sim.fish.map(f=>{
 const pads=new Sprite(initialStyle.surface.texture);pads.width=WORLD.width;pads.height=WORLD.height;world.addChild(pads);
 let surfaceOcclusion=initialStyle.surface;
 const lotus=new LotusVisuals(world,initialStyle.lotus,growth);
-const water=createWaterFilter(climate.texture,moonTexture);world.filters=[water];world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
+const water=createWaterFilter(climate.texture,moonTexture,initialStyle.surface.texture);world.filters=[water];world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
 // Tiny bits of drifting pollen lend depth without turning the water into a particle effect.
 const motes=new Container();world.addChild(motes);
 const shoreWorld=new Container();app.stage.addChild(shoreWorld);
@@ -78,6 +78,7 @@ function applySceneStyle(style){
  shore.setStyle(style.shore,style.winter,style.layout);
  lotus.setStyle(style.lotus);life.setStyle(style.life);
  water.resources.waterUniforms.uniforms.uStyle=style.key==='cartoon'?1:0;
+ water.resources.uSurface=style.surface.texture.source;
 }
 applySceneStyle(initialStyle);
 const appearance=setupSceneStyle(initialStyle,style=>{applySceneStyle(style);refreshScene();});
@@ -150,12 +151,13 @@ function updateSky(date=new Date()){
  return sky;
 }
 function updateLife(w=weather.forScene()){
- lotus.update(sim.time,w);shore.snowCover=climate.snowCover;shore.winterAmount=climate.winterAmount;shore.update(sim.time,w);life.update(sim.time,w);
+ lotus.update(sim.time,w,shore.season);shore.snowCover=climate.snowCover;shore.winterAmount=climate.winterAmount;shore.update(sim.time,w);life.update(sim.time,w);
 }
 function updateVisuals(updateAnimals=true){
  updateSky();
  sim.fish.forEach((f,i)=>{const {mesh,shadow}=visuals[i];deform(mesh,f);shadow.vertices.set(mesh.vertices);shadow.position.set(mesh.x+5+f.depth*3,mesh.y+7+f.depth*4);shadow.rotation=mesh.rotation;mesh.alpha=(.87+f.depth*.1)*(1-climate.iceAt(f.x,f.y)*.32);});
  const u=water.resources.waterUniforms.uniforms;u.uTime=sim.time;
+ u.uWinter=shore.season==='winter'?1:0;
  const w=weather.forScene();u.uWeather[0]=w.cloud;u.uWeather[1]=w.light;u.uWeather[2]=w.wind/12;u.uWeather[3]=w.snow;u.uWind[0]=w.windX;u.uWind[1]=w.windY;
  u.uClimate[0]=climate.freeze;u.uClimate[1]=climate.snowCover;u.uClimate[2]=budget.quality;u.uClimate[3]=w.temp;
  climate.updatePlants();
@@ -250,6 +252,7 @@ updateVisuals();ready=true;document.querySelector('#loading').classList.add('don
 // Small deterministic observation API for verification and reproducible captures.
 window.__pond={get ready(){return ready},get renderer(){return app.renderer.name},get paused(){return paused},get frames(){return frames},get lastClick(){return lastClick},snapshot:()=>sim.snapshot(),weather:()=>({source:weather.source,preset:weather.preset,current:{...weather.current},target:{...weather.target},timeMode:weather.timeMode}),growth:()=>growth.snapshot(),sky:()=>structuredClone(sky),climate:()=>climate.snapshot(),wildlife:()=>life.snapshot(),butterflies:()=>shore.butterflies.map(b=>({x:b.x,y:b.y,state:b.state,height:b.height,visible:b.sprite.visible})),precipitation:()=>({rain:structuredClone(atmosphere.frame.rain),impacts:structuredClone(atmosphere.frame.impacts),snow:structuredClone(atmosphere.frame.snow),shaderImpacts:structuredClone(atmosphere.frame.shaderImpacts)}),performance:()=>({...budget.snapshot(),resolution:app.renderer.resolution,drawPixels:app.canvas.width*app.canvas.height}),viewport:()=>({x:world.x,y:world.y,width:WORLD.width*world.scale.x,height:WORLD.height*world.scale.y,scaleX:world.scale.x,scaleY:world.scale.y,windowWidth:innerWidth,windowHeight:innerHeight}),waterAt:(x,y)=>isWater(x,y),surfaceAt:(x,y)=>climate.surfaceAt(x,y)};
 window.__pond.shoreLife=()=>shore.snapshot();
+window.__pond.plantsDisplay=()=>lotus.snapshot();
 window.__pond.appearance=()=>appearance.snapshot();
 window.__pond.seasons=()=>seasons.snapshot();
 window.__pond.precipitationBudget=()=>({season:atmosphere.frame.season,rainBudget:atmosphere.frame.rainBudget,rainCount:atmosphere.frame.rainCount,snowCount:atmosphere.frame.snowCount,drawnRain:atmosphere.rain.particleChildren.length,drawnSnow:atmosphere.snow.particleChildren.length,rings:atmosphere.frame.impacts.length});

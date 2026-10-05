@@ -19,11 +19,13 @@ out vec4 finalColor;
 uniform sampler2D uTexture;
 uniform sampler2D uTerrain;
 uniform sampler2D uMoonTexture;
+uniform sampler2D uSurface;
 uniform mediump vec4 uInputSize;
 uniform vec4 uInputClamp;
 uniform mediump vec4 uOutputFrame;
 uniform float uTime;
 uniform float uStyle;
+uniform float uWinter;
 uniform vec2 uWorld;
 uniform vec2 uOrigin;
 uniform vec4 uClimate; // ice, settled snow, rendering quality, temperature
@@ -135,6 +137,13 @@ void main() {
   color.rgb*=.96+.04*vignette;
   color.rgb*=mix(vec3(.24,.41,.50),vec3(1.),uWeather.y)*(1.-uWeather.x*.19);
   color.rgb=mix(color.rgb,color.rgb*vec3(.87,.96,1.08),uWeather.w*.4);
+  // Reuse the cached foreground mask inside this pass; only foliage loses green.
+  if(uWinter>.5){
+    vec4 surface=texture(uSurface,clamp(localWorld/vec2(1672.,941.),0.,1.));
+    float foliage=surface.a*smoothstep(.015,.09,surface.g-surface.b)*smoothstep(-.02,.035,surface.g-surface.r);
+    float shade=dot(color.rgb,vec3(.25,.6,.15));
+    color.rgb=mix(color.rgb,vec3(.89,.73,.49)*shade,foliage*.94);
+  }
   // Small sunlight facets sparkle as surface normals turn toward the sun.
   // Cloud/rain dim the glints; the broader caustics above remain underwater.
   vec2 sunDelta=world-uSun.xy;
@@ -171,10 +180,10 @@ void main() {
   color.rgb=mix(color.rgb,vec3(.82,.86,.83)*(.48+.52*uWeather.y),clamp(settled,0.,.78));
   finalColor=vec4(color.rgb,color.a);
 }`;
-export function createWaterFilter(terrain,moonTexture) {
- const uniforms={uTime:{value:0,type:'f32'},uStyle:{value:0,type:'f32'},uWorld:{value:[1672,941],type:'vec2<f32>'},uOrigin:{value:[0,0],type:'vec2<f32>'},uClimate:{value:[0,0,1,20],type:'vec4<f32>'},uWeather:{value:[.08,1,.1,0],type:'vec4<f32>'},uWind:{value:[0,0],type:'vec2<f32>'},uMoon:{value:[1000,280,0,1],type:'vec4<f32>'},uSun:{value:[835,350,1,.5],type:'vec4<f32>'}};
+export function createWaterFilter(terrain,moonTexture,surface) {
+ const uniforms={uTime:{value:0,type:'f32'},uStyle:{value:0,type:'f32'},uWinter:{value:0,type:'f32'},uWorld:{value:[1672,941],type:'vec2<f32>'},uOrigin:{value:[0,0],type:'vec2<f32>'},uClimate:{value:[0,0,1,20],type:'vec4<f32>'},uWeather:{value:[.08,1,.1,0],type:'vec4<f32>'},uWind:{value:[0,0],type:'vec2<f32>'},uMoon:{value:[1000,280,0,1],type:'vec4<f32>'},uSun:{value:[835,350,1,.5],type:'vec4<f32>'}};
  for(let i=0;i<8;i++)uniforms['uLeaf'+i]={value:[0,0,0,0],type:'vec4<f32>'};
  for(let i=0;i<5;i++) uniforms['uRipple'+i]={value:[0,0,-100,0],type:'vec4<f32>'};
  for(let i=0;i<16;i++) uniforms['uRainImpact'+i]={value:[0,0,-100,0],type:'vec4<f32>'};
- return new Filter({glProgram:GlProgram.from({vertex,fragment,name:'pond-water'}),resources:{waterUniforms:uniforms,uTerrain:terrain.source,uMoonTexture:moonTexture.source},padding:0,resolution:'inherit'});
+ return new Filter({glProgram:GlProgram.from({vertex,fragment,name:'pond-water'}),resources:{waterUniforms:uniforms,uTerrain:terrain.source,uMoonTexture:moonTexture.source,uSurface:surface.source},padding:0,resolution:'inherit'});
 }
