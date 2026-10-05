@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 
 export async function createStandaloneHtml({ wallpaper = false } = {}) {
   const assets = {};
-  for (const name of ['koi-atlas.png','lotus-growth.png','shore-life.png','moon-reference.png','shore-winter.png','pond-cartoon.webp','pond-natural.webp','pond-winter-cartoon.webp','pond-winter-natural.webp','fish-cartoon.webp','shore-cartoon.webp','shore-cartoon-winter.webp','lotus-cartoon.webp','pond-life-cartoon.webp','pond-life-natural.webp']) {
+  for (const name of ['koi-atlas.png','lotus-growth.png','shore-life.png','moon-reference.png','ice-material.webp','shore-winter.png','pond-cartoon.webp','pond-natural.webp','pond-winter-cartoon.webp','pond-winter-natural.webp','fish-cartoon.webp','shore-cartoon.webp','shore-cartoon-winter.webp','lotus-cartoon.webp','pond-life-cartoon.webp','pond-life-natural.webp']) {
     assets['/assets/' + name] = `data:image/${name.endsWith('.webp') ? 'webp' : 'png'};base64,` + (await fs.readFile('public/assets/' + name)).toString('base64');
   }
   const result = await build({

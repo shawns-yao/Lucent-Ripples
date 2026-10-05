@@ -55,12 +55,20 @@ export function createSurfaceOcclusion(bottom, style, includeLeaves=true) {
     if(!coverage[k])data[k*4+3]=0;
   }
   context.putImageData(pixels,0,0);
-  // A small leaf-only mask excludes rocks from seasonal recoloring.
+  // R: seasonal leaves. G: ice contact inferred from the winter artwork,
+  // including shallow margins outside the conservative fish navigation polygon.
   const mask=document.createElement('canvas');mask.width=418;mask.height=236;
   const mc=mask.getContext('2d'),mp=mc.createImageData(mask.width,mask.height);
   for(let y=0;y<mask.height;y++)for(let x=0;x<mask.width;x++){
-    const value=coverage[Math.min(940,Math.floor((y+.5)*941/236))*1672+Math.floor((x+.5)*4)],k=(y*mask.width+x)*4;
+    const sourceIndex=Math.min(940,Math.floor((y+.5)*941/236))*1672+Math.floor((x+.5)*4);
+    const value=coverage[sourceIndex],k=(y*mask.width+x)*4;
     mp.data[k]=value===1||value===2?255:0;mp.data[k+3]=255;
+    if(!includeLeaves){
+      const i=sourceIndex*4,r=data[i],g=data[i+1],b=data[i+2];
+      const green=Math.max(0,Math.min(1,(g-r+4)/18));
+      const waterTone=Math.max(0,Math.min(1,(g-b+4)/18));
+      mp.data[k+1]=Math.round(255*green*waterTone);
+    }
   }
   mc.putImageData(mp,0,0);
   return {texture:Texture.from(canvas),foliage:Texture.from(mask),leafPixels,

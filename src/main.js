@@ -34,7 +34,7 @@ await app.init({resizeTo:window,preference:'webgl',antialias:true,resolution:ren
 host.appendChild(app.canvas);
 app.canvas.setAttribute('aria-label','水光粼粼的池塘，44 条鱼儿自由游动。点击水面投下涟漪，吸引附近的鱼');
 app.canvas.tabIndex=0;
-const [initialStyle,moonTexture]=await Promise.all([loadSceneStyle(wallpaper.enabled?wallpaper.options.style:savedSceneStyle()),Assets.load('/assets/moon-reference.png')]);
+const [initialStyle,moonTexture,iceTexture]=await Promise.all([loadSceneStyle(wallpaper.enabled?wallpaper.options.style:savedSceneStyle()),Assets.load('/assets/moon-reference.png'),Assets.load({src:'/assets/ice-material.webp',data:{autoGenerateMipmaps:true,minFilter:'linear',mipmapFilter:'linear'}})]);
 const bottom=initialStyle.bottom;
 const world=new Container();app.stage.addChild(world);
 const bg=new Sprite(bottom);bg.width=WORLD.width;bg.height=WORLD.height;world.addChild(bg);
@@ -63,7 +63,7 @@ const pads=new Sprite(initialStyle.surface.texture);pads.width=WORLD.width;pads.
 let surfaceOcclusion=initialStyle.surface,activeStyle=initialStyle,shownWinter=null;
 const lotus=new LotusVisuals(world,initialStyle.lotus,growth,shadows);
 const winterRemnants=createWinterRemnants(world);
-const water=createWaterFilter(climate.texture,moonTexture,initialStyle.surface.foliage);world.filters=[water];world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
+const water=createWaterFilter(climate.texture,moonTexture,initialStyle.surface.foliage,iceTexture);world.filters=[water];world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
 // Tiny bits of drifting pollen lend depth without turning the water into a particle effect.
 const motes=new Container();world.addChild(motes);
 const shoreWorld=new Container();app.stage.addChild(shoreWorld);
@@ -90,7 +90,7 @@ function applySceneStyle(style){
  lotus.setStyle(style.lotus);life.setStyle(style.life);
  vegetation.setStyle(style.key);ecology.setStyle(style.key);
  water.resources.waterUniforms.uniforms.uStyle=style.key==='cartoon'?1:0;
- water.resources.uSurface=style.surface.foliage.source;
+ water.resources.uSurface=(shownWinter?style.winterSurface:style.surface).foliage.source;
 }
 applySceneStyle(initialStyle);
 const appearance=setupSceneStyle(initialStyle,style=>{applySceneStyle(style);refreshScene();});
@@ -161,7 +161,7 @@ function updateSky(date=new Date()){
    shownWinter=climate.seasonWinter;
    bg.texture=shownWinter?activeStyle.winterBottom:activeStyle.bottom;
    surfaceOcclusion=shownWinter?activeStyle.winterSurface:activeStyle.surface;
-   pads.texture=surfaceOcclusion.texture;water.resources.uSurface=activeStyle.surface.foliage.source;
+   pads.texture=surfaceOcclusion.texture;water.resources.uSurface=surfaceOcclusion.foliage.source;
    bg.width=pads.width=WORLD.width;bg.height=pads.height=WORLD.height;winterRemnants.visible=shownWinter;
  }
  const key=JSON.stringify([weather.timeMode,weather.location]);

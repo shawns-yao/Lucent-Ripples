@@ -25,7 +25,9 @@ function terrainTexture() {
     const jagged=4*Math.sin(wx*.085+wy*.054)+3*Math.sin(wy*.11-wx*.033);
     const boundary=(Math.hypot(dx/490,dy/195)-1)*180+inlet+jagged;
     const thickness=clamp(.3+boundary/110);
-    pixels.data[k+3]=Math.round(255*(winterWater?thickness:0));
+    // Freeze thickness extends into shallow margins. The artwork mask controls
+    // visible shore/rock coverage; navigation still uses the conservative water map.
+    pixels.data[k+3]=Math.round(255*thickness);
   }
   // Upload data directly: a canvas would lose RGB precision where ice alpha is zero.
   const texture=new Texture({source:new BufferImageSource({resource:new Uint8Array(pixels.data.buffer),width:canvas.width,height:canvas.height,format:'rgba8unorm',alphaMode:'no-premultiply-alpha',scaleMode:'linear'})});
