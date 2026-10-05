@@ -147,7 +147,10 @@ function updateSky(date=new Date()){
  }
  return sky;
 }
-function updateVisuals(){
+function updateLife(w=weather.forScene()){
+ lotus.update(sim.time,w);shore.snowCover=climate.snowCover;shore.winterAmount=climate.winterAmount;shore.update(sim.time,w);life.update(sim.time,w);
+}
+function updateVisuals(updateAnimals=true){
  updateSky();
  sim.fish.forEach((f,i)=>{const {mesh,shadow}=visuals[i];deform(mesh,f);shadow.vertices.set(mesh.vertices);shadow.position.set(mesh.x+5+f.depth*3,mesh.y+7+f.depth*4);shadow.rotation=mesh.rotation;mesh.alpha=(.87+f.depth*.1)*(1-climate.iceAt(f.x,f.y)*.32);});
  const u=water.resources.waterUniforms.uniforms;u.uTime=sim.time;
@@ -155,7 +158,7 @@ function updateVisuals(){
  u.uClimate[0]=climate.freeze;u.uClimate[1]=climate.snowCover;u.uClimate[2]=budget.quality;u.uClimate[3]=w.temp;
  climate.updatePlants();
  for(let i=0;i<8;i++){const leaf=climate.leaves[i],values=u['uLeaf'+i];values[0]=leaf.x;values[1]=leaf.y;values[2]=leaf.radius;}
- lotus.update(sim.time,w);shore.snowCover=climate.snowCover;shore.winterAmount=climate.winterAmount;shore.update(sim.time,w);life.update(sim.time,w);
+ if(updateAnimals)updateLife(w);
  const precipitation=atmosphere.update(sim.time,w,view,growth.plants,budget.quality,seasons.selected());
  // Real sky directions map into this fixed north-up pond. An explicit preview
  // illustrates a visible moon inside the viewport, including narrow screens.
@@ -170,7 +173,18 @@ function updateVisuals(){
  for(const p of pollen){const x=((p.x+sim.time*(1.6+w.windX*6))%WORLD.width+WORLD.width)%WORLD.width,y=p.y+Math.sin(sim.time*.18+p.phase)*7+Math.sin(sim.time*.07+p.phase)*w.windY*6;p.sprite.position.set(x,y);p.sprite.visible=isWater(x,y);}
 }
 app.ticker.maxFPS=wallpaper.fps;
-app.ticker.add(t=>{const start=performance.now();frames++;const date=new Date();updateSky(date);growth.step(date.getTime());const dt=Math.min(t.deltaMS/1000,1/20);weather.step(dt,date,sky.daylight);if(!paused){const w=weather.forScene();climate.step(dt,w,weather.source);sim.step(dt,w);}updateVisuals();if(!paused)budget.record(start,performance.now()-start,app.ticker.maxFPS);if(budget.changed){budget.changed=false;fit();}});
+app.ticker.add(t=>{
+ const start=performance.now();frames++;const date=new Date();updateSky(date);growth.step(date.getTime());
+ // Raw elapsed time avoids slow motion; bounded steps preserve collision stability.
+ const elapsed=Math.min(Math.max(t.elapsedMS/1000,0),2),steps=Math.max(1,Math.ceil(elapsed/(1/20))),dt=elapsed/steps;
+ for(let i=0;i<steps;i++){
+   weather.step(dt,date,sky.daylight);
+   if(!paused){const w=weather.forScene();climate.step(dt,w,weather.source);sim.step(dt,w);updateLife(w);}
+ }
+ updateVisuals(paused);
+ if(!paused)budget.record(start,performance.now()-start,app.ticker.maxFPS);
+ if(budget.changed){budget.changed=false;fit();}
+});
 function syncPlayback(){budget.resetClock();if(document.hidden||wallpaper.hostPaused)app.ticker.stop();else app.ticker.start();}
 document.addEventListener('visibilitychange',syncPlayback);
 window.addEventListener('pagehide',()=>growth.persist(true));
