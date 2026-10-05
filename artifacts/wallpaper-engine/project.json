@@ -134,6 +134,35 @@
         "text": "鼠标互动与拖动",
         "type": "bool",
         "value": true
+      },
+      "pondfishdensity": {
+        "order": 7,
+        "text": "鱼群数量（季节默认值的百分比）",
+        "type": "slider",
+        "value": 100,
+        "min": 0,
+        "max": 100,
+        "fraction": false
+      },
+      "pondeffects": {
+        "order": 8,
+        "text": "特效强度",
+        "type": "combo",
+        "value": "high",
+        "options": [
+          {
+            "label": "低",
+            "value": "low"
+          },
+          {
+            "label": "中",
+            "value": "medium"
+          },
+          {
+            "label": "高",
+            "value": "high"
+          }
+        ]
       }
     }
   },
