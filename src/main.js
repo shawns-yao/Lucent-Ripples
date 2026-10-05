@@ -29,7 +29,7 @@ const climate=new PondClimate(growth.plants),budget=new FrameBudget();sim.surfac
 const surfaceMotion=new SurfaceMotion();
 const renderResolution=()=>Math.min(devicePixelRatio||1,1.5,2560/Math.max(innerWidth,innerHeight),Math.sqrt(wallpaper.pixelBudget*budget.quality/Math.max(1,innerWidth*innerHeight)));
 const TILT=.9; // A gentle 2.5D oblique overhead projection, not a full 3D camera.
-let paused=false,ready=false,frames=0,lastClick=null,sky=null,skyKey="",skyCheckedAt=0;
+let paused=false,ready=false,frames=0,lastClick=null,sky=null,skyKey="",skyCheckedAt=0,panelUpdatedAt=0;
 const params=new URLSearchParams(location.search);
 await app.init({resizeTo:window,preference:'webgl',antialias:true,resolution:renderResolution(),autoDensity:true,background:0x263f38,powerPreference:'high-performance'});
 host.appendChild(app.canvas);
@@ -198,6 +198,11 @@ function updateVisuals(updateAnimals=true){
  for(let i=0;i<6;i++){const p=surfaceMotion.records[i],values=u['uWake'+i];values[0]=p.x;values[1]=p.y;values[2]=p.created;values[3]=p.strength;}
  for(let i=0;i<8;i++){const leaf=climate.leaves[i],values=u['uLeaf'+i];values[0]=leaf.x;values[1]=leaf.y;values[2]=leaf.radius;}
  if(updateAnimals)updateLife(w);
+ if(Date.now()-panelUpdatedAt>=1000){
+   panelUpdatedAt=Date.now();
+   weatherUI.updateScene({fish:sim.activeFish.length,flowers:lotus.flowerObstacles.filter(p=>p.radius>0).length,
+     surface:climate.iceLevel>.15?'局部结冰':w.rain>.2?'雨波':w.wind>4?'涟漪':'平静'});
+ }
  const precipitation=atmosphere.update(sim.time,w,view,growth.plants,budget.quality*effects,seasons.selected());
  // Real sky directions map into this fixed north-up pond. An explicit preview
  // illustrates a visible moon inside the viewport, including narrow screens.
@@ -226,6 +231,7 @@ app.ticker.add(t=>{
 });
 function refreshScene(){
  if(!ready)return;
+ panelUpdatedAt=0;
  const date=new Date();updateSky(date);growth.step(date.getTime());
  if(paused){weather.step(0,date,sky.daylight);Object.assign(weather.current,weather.target);skyCheckedAt=0;}
  updateVisuals();

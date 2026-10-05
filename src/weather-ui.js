@@ -38,7 +38,7 @@ export function setupWeatherUI(weather, growth, onChange = () => {}) {
   const setStatus = (text) => { status.textContent = text; };
   const setSearching = (busy) => cityForm.setAttribute('aria-busy', String(busy));
   const updateSummary = () => {
-    clock.setWeather(`${weather.target.label} · ${weather.source === 'live' ? '当地天气' : '演示'}`);
+    clock.setWeather(weather);
     buttons.forEach((button) => {
       button.setAttribute('aria-pressed', String(button.dataset.weather === weather.preset));
       button.disabled = button.dataset.weather === 'snow' && weather.season !== 'winter';
@@ -252,6 +252,7 @@ export function setupWeatherUI(weather, growth, onChange = () => {}) {
     setDemo: demo,
     setTime,
     refreshSummary: updateSummary,
+    updateScene: clock.setScene,
     get locationActive() { return Boolean(activeLocation); },
     destroy: () => { cancel(); clock.destroy(); activeLocation = null; listeners.forEach((remove) => remove()); },
   };

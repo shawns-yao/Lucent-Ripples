@@ -1,20 +1,39 @@
 canvas:focus-visible{outline:2px solid #edf1c4;outline-offset:-4px}
-/* The clock stays useful on the desktop; settings only expand on demand. */
-:root #weather-summary{display:grid;grid-template-columns:1fr auto;gap:5px 14px;width:194px;padding:14px 17px;border-radius:14px;letter-spacing:0;background:#183d35d9;box-shadow:0 5px 22px #102d2520}
+/* Desktop-first translucent panel; no continuously blurred WebGL backdrop. */
+:root #weather-panel{width:352px;top:32px;right:36px}
+:root #weather-summary{display:grid;grid-template-columns:1fr;gap:10px;width:100%;float:none;overflow:hidden;padding:27px 29px 17px;border:1px solid #e1fff1a8;border-radius:25px;letter-spacing:0;background:linear-gradient(135deg,#398273c9,#123e36dc);backdrop-filter:none;box-shadow:inset 0 1px 0 #ffffff38,0 12px 36px #092f3224;text-shadow:0 1px 2px #16453740}
 :root #weather-summary:before{display:none}
-#scene-clock{grid-column:1/-1;font:400 36px/1.05 "Segoe UI",system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.02em;color:#f5f2df}
-.clock-date{grid-column:1/-1;color:#d3dece;font-size:11px;line-height:1.6}
-.clock-weather{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;margin-top:5px;padding-top:9px;border-top:1px solid #d7e1ce24;font-size:11px;color:#e4e8d7}
-.clock-weather:after{content:"";width:6px;height:6px;border-right:1px solid currentColor;border-bottom:1px solid currentColor;transform:rotate(45deg);margin-right:2px;margin-top:-3px}
-#weather-panel[open] .clock-weather:after{transform:rotate(225deg);margin-top:3px}
-:root #weather-panel[open] #weather-summary{width:100%}
-:root .weather-content{max-height:calc(100dvh - 190px)}
+#scene-clock{font:500 66px/1.05 "Segoe UI",system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.01em;color:#f7fff9}
+.clock-date{color:#e7f3eb;font-size:15px;line-height:1.6}
+.clock-weather{display:flex;align-items:center;gap:10px;margin-top:7px;font-size:14px;color:#f0fbf3;min-height:34px}
+.clock-icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.weather-symbol{width:28px;height:28px;color:#d7ede5}
+.clock-weather[data-weather=clear] .weather-symbol{color:#ffdc6d}
+.clock-weather[data-weather=clear] .weather-symbol path:first-child{fill:#ffdc6d;stroke:none}
+.clock-season{border-left:1px solid #dbf6e64d;padding-left:10px;color:#e6f2e8}
+.clock-source{margin-left:auto;font-size:10px;letter-spacing:.1em;color:#d4e8df}
+.clock-stats{display:grid;grid-template-columns:1fr 1fr;gap:17px 14px;padding:20px 0;margin-top:9px;border-top:1px solid #e1f4e63b}
+.clock-stat{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px;color:#cde5da}
+.clock-stat:nth-child(even){border-left:1px solid #e1f4e63b;padding-left:14px}
+.clock-stat .clock-icon{width:18px;height:18px}
+.clock-value{margin-left:auto;color:#f0faf2;white-space:nowrap;font-variant-numeric:tabular-nums}
+.clock-settings{display:flex;align-items:center;gap:9px;padding-top:15px;border-top:1px solid #e1f4e63b;color:#deefe5;font-size:12px}
+.clock-chevron{margin-left:auto}
+#weather-panel[open] .clock-chevron{transform:rotate(180deg)}
+:root #weather-panel[open] #weather-summary{padding:18px 24px;border-radius:22px;margin-bottom:8px;gap:5px}
+#weather-panel[open] #scene-clock{font-size:38px}
+#weather-panel[open] .clock-stats,#weather-panel[open] .clock-settings{display:none}
+#weather-panel[open] .clock-date{font-size:12px}
+#weather-panel[open] .clock-weather{margin-top:0;font-size:12px}
+:root .weather-content{max-height:calc(100dvh - 232px);background:#163f36f5;backdrop-filter:none;border-color:#dceee047;border-radius:22px}
 .wallpaper-settings{display:grid;gap:12px;margin:16px 0;padding-top:15px;border-top:1px solid #dae5c91a}
 .wallpaper-settings label{display:grid;gap:7px;color:#d5ddc7}
 .wallpaper-settings select{width:100%;min-height:36px;border:1px solid #dce7c83d;border-radius:6px;padding:7px;background:#214b40;color:#eeeeda;font:inherit}
 .wallpaper-settings input[type=range]{width:100%;accent-color:#bdce99}
 #weather-panel select:focus-visible{outline:2px solid #edf1c4;outline-offset:3px}
-@media(max-width:700px) and (orientation:portrait){:root #weather-summary{width:172px;padding:12px 14px}#scene-clock{font-size:31px}:root .weather-content{max-height:calc(100dvh - 176px)}}
+@media(min-width:2200px){:root #weather-panel{width:390px;top:40px;right:48px}#scene-clock{font-size:76px}.clock-date{font-size:17px}.clock-weather{font-size:16px}.clock-stats{padding:24px 0}.clock-stat{font-size:14px}}
+@media(max-height:720px){:root #weather-panel:not([open]) #weather-summary{padding:19px 24px}#weather-panel:not([open]) #scene-clock{font-size:48px}.clock-stats{padding:13px 0;gap:12px}}
+@media(max-width:700px){:root #weather-panel{width:min(320px,calc(100vw - 28px))}:root #weather-panel:not([open]){width:210px}:root #weather-summary{padding:16px 19px;border-radius:19px}#scene-clock{font-size:42px}.clock-date{font-size:12px}.clock-weather{font-size:12px;gap:7px}.clock-season,.clock-stats{display:none}.clock-settings{padding-top:11px}.weather-symbol{width:22px;height:22px}:root .weather-content{max-height:calc(100dvh - 210px)}}
 #weather-panel button[data-weather=snow]:disabled{cursor:not-allowed}
 html[data-wallpaper=true] #hint,html[data-wallpaper=true] .controls,html[data-wallpaper=true] #loading p{display:none!important}
 html[data-wallpaper=true] .local-weather,html[data-wallpaper=true] .growth-controls{display:none}
