@@ -27,6 +27,7 @@ uniform float uTime;
 uniform float uStyle;
 uniform float uWinter;
 uniform float uSeason;
+uniform float uMist;
 uniform vec2 uWorld;
 uniform vec2 uOrigin;
 uniform vec4 uClimate; // ice, settled snow, rendering quality, temperature
@@ -191,20 +192,36 @@ void main() {
   float frost=pow(noise(localWorld*.045),5.)*.07+pow(noise(localWorld*.19),7.)*.015;
   vec3 iceColor=vec3(.66,.78,.83)*(.32+.68*uWeather.y);
   float iceCoverage=smoothstep(.27,.31,ice);
-  float opacity=.34+cloud*.13+smoothstep(.45,.9,ice)*.25;
+  float opacity=.12+cloud*.05+smoothstep(.42,.95,ice)*.22;
   color.rgb=mix(color.rgb,iceColor,iceCoverage*opacity);
-  float rim=iceCoverage*(1.-smoothstep(.32,.39,ice));
-  color.rgb+=vec3(.59,.73,.79)*rim*.28*(.25+.75*uWeather.y);
+  float rim=iceCoverage*(1.-smoothstep(.31,.34,ice));
+  color.rgb+=vec3(.59,.73,.79)*rim*.12*(.25+.75*uWeather.y);
   color.rgb+=vec3(.73,.84,.87)*(frost+crack*.22)*iceCoverage*(.25+.75*uWeather.y);
+  float freezeLine=pow(max(0.,sin(localWorld.x*.075+localWorld.y*.027+noise(localWorld*.009)*9.)),28.);
+  float striation=freezeLine*smoothstep(.54,.78,cloud)*.045;
+  vec2 bubbleCell=floor(localWorld/29.),bubbleHash=hash22(bubbleCell);
+  vec2 bubblePoint=fract(localWorld/29.)-(.2+bubbleHash*.6);
+  float bubbleRadius=length(bubblePoint*vec2(1.,1.4));
+  float bubble=(1.-smoothstep(.009,.023,abs(bubbleRadius-.04)))*step(.965,bubbleHash.y)*.16;
+  color.rgb+=vec3(.65,.79,.82)*(striation+bubble)*iceCoverage*(.25+.75*uWeather.y);
   float ground=1.-wet;
   float settled=ground*uClimate.y*(.08+.34*pow(noise(localWorld*.075),2.));
-  settled+=ice*max(uClimate.y,uWinter*.22)*pow(grain,3.)*.32;
+  settled+=smoothstep(.78,.96,ice)*max(uClimate.y,uWinter*.14)*smoothstep(.63,.82,grain)*.22;
   color.rgb=mix(color.rgb,vec3(.82,.86,.83)*(.48+.52*uWeather.y),clamp(settled,0.,.78));
+  // Airborne mist drifts over open water; the ice pattern above stays fixed.
+  if(uMist>.001){
+    vec2 mistUV=localWorld/vec2(380.,135.)+vec2(-t*.008,t*.002);
+    float veil=smoothstep(.42,.78,noise(mistUV+noise(mistUV*.7)));
+    float pocket=exp(-pow((localWorld.y-440.)/240.,2.));
+    float mist=veil*pocket*uMist*wet*(1.-iceCoverage);
+    color.rgb=mix(color.rgb,vec3(.68,.77,.78)*(.34+.66*uWeather.y),mist);
+  }
   finalColor=vec4(color.rgb,color.a);
 }`;
 export function createWaterFilter(terrain,moonTexture,surface) {
  const uniforms={uTime:{value:0,type:'f32'},uStyle:{value:0,type:'f32'},uWinter:{value:0,type:'f32'},uWorld:{value:[1672,941],type:'vec2<f32>'},uOrigin:{value:[0,0],type:'vec2<f32>'},uClimate:{value:[0,0,1,20],type:'vec4<f32>'},uWeather:{value:[.08,1,.1,0],type:'vec4<f32>'},uWind:{value:[0,0],type:'vec2<f32>'},uMoon:{value:[1000,280,0,1],type:'vec4<f32>'},uSun:{value:[835,350,1,.5],type:'vec4<f32>'}};
  uniforms.uSeason={value:1,type:'f32'};
+ uniforms.uMist={value:0,type:'f32'};
  for(let i=0;i<8;i++)uniforms['uLeaf'+i]={value:[0,0,0,0],type:'vec4<f32>'};
  for(let i=0;i<5;i++) uniforms['uRipple'+i]={value:[0,0,-100,0],type:'vec4<f32>'};
  for(let i=0;i<6;i++) uniforms['uWake'+i]={value:[0,0,-100,0],type:'vec4<f32>'};

@@ -188,6 +188,9 @@ function updateVisuals(updateAnimals=true){
  u.uWinter=shore.season==='winter'?1:0;
  u.uSeason=seasonProfile(shore.season).index;
  const w=weather.forScene();u.uWeather[0]=w.cloud;u.uWeather[1]=w.light;u.uWeather[2]=w.wind/12;u.uWeather[3]=w.snow;u.uWind[0]=w.windX;u.uWind[1]=w.windY;
+ const twilight=Math.max(0,1-Math.abs(sky.sun.altitude-.035)/.22);
+ const seasonalMist=[.15,.08,.18,.12][u.uSeason];
+ u.uMist=seasonalMist*(.18+twilight*.82)*(1-Math.min(1,w.wind/9))*(1-w.rain*.85)*(1+.15*Math.sin(sim.time*.025));
  u.uClimate[0]=climate.iceLevel;u.uClimate[1]=climate.snowCover;u.uClimate[2]=budget.quality;u.uClimate[3]=w.temp;
  climate.updatePlants();
  surfaceMotion.update(sim.time,sim.activeFish,climate,w);
@@ -289,6 +292,7 @@ window.__pond.flowerObstacles=()=>lotus.flowerObstacles.map(p=>({...p}));
 window.__pond.appearance=()=>appearance.snapshot();
 window.__pond.seasons=()=>seasons.snapshot();
 window.__pond.seasonScene=()=>({season:shore.season,profile:{...seasonProfile(shore.season)},activeFish:sim.activeFish.length,visibleFish:visuals.filter(v=>v.mesh.visible).length,fish:sim.fish.map((f,i)=>({id:f.id,active:f.active,visible:visuals[i].mesh.visible,x:f.x,y:f.y,speed:f.speed,depth:f.submergence/Math.max(.01,f.waterDepth)})),leafRadii:climate.leaves.map(p=>p.radius)});
+window.__pond.mist=()=>({strength:water.resources.waterUniforms.uniforms.uMist,time:sim.time,sunAltitude:sky.sun.altitude});
 window.__pond.precipitationBudget=()=>({season:atmosphere.frame.season,rainBudget:atmosphere.frame.rainBudget,rainCount:atmosphere.frame.rainCount,snowCount:atmosphere.frame.snowCount,drawnRain:atmosphere.rain.particleChildren.length,drawnSnow:atmosphere.snow.particleChildren.length,rings:atmosphere.frame.impacts.length});
 window.__pond.meshBudget=()=>({fishVertices:(COLS+1)*(ROWS+1),batchedFish:visuals.filter(v=>v.mesh.batched).length});
 window.__pond.neighborBudget=()=>({checks:sim.neighborChecks,allPairs:sim.fish.length*(sim.fish.length-1),cells:sim.gridHeads.length});
