@@ -155,7 +155,13 @@ function updateLife(w=weather.forScene()){
 }
 function updateVisuals(updateAnimals=true){
  updateSky();
- sim.fish.forEach((f,i)=>{const {mesh,shadow}=visuals[i];deform(mesh,f);shadow.vertices.set(mesh.vertices);shadow.position.set(mesh.x+5+f.depth*3,mesh.y+7+f.depth*4);shadow.rotation=mesh.rotation;mesh.alpha=(.87+f.depth*.1)*(1-climate.iceAt(f.x,f.y)*.32);});
+ sim.fish.forEach((f,i)=>{
+   const {mesh,shadow}=visuals[i];deform(mesh,f);shadow.vertices.set(mesh.vertices);
+   const clearance=Math.max(0,f.waterDepth-f.submergence);
+   shadow.position.set(mesh.x+4+clearance*19,mesh.y+5+clearance*25);shadow.rotation=mesh.rotation;
+   shadow.scale.set(1+clearance*.16);shadow.alpha=.17-clearance*.18;
+   mesh.alpha=(.96-f.submergence*.26)*(1-climate.iceAt(f.x,f.y)*.32);
+ });
  const u=water.resources.waterUniforms.uniforms;u.uTime=sim.time;
  u.uWinter=shore.season==='winter'?1:0;
  const w=weather.forScene();u.uWeather[0]=w.cloud;u.uWeather[1]=w.light;u.uWeather[2]=w.wind/12;u.uWeather[3]=w.snow;u.uWind[0]=w.windX;u.uWind[1]=w.windY;

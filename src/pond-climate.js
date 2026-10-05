@@ -1,11 +1,12 @@
 import { Texture } from 'pixi.js';
 import { isOpenWater, isPad, isWater, shoreDistance } from './pond-surface.js';
 import { lotusAppearance } from './lotus-growth.js';
+import { waterDepth } from './pond-layout.js';
 
 const clamp=(n,a=0,b=1)=>Math.max(a,Math.min(b,n));
 const WORLD_WIDTH=1672,WORLD_HEIGHT=941;
 
-/** R: moving water, G: snow-catching ground, B: distance from the bank. */
+/** R: moving water, G: snow-catching ground, B: normalized visual depth. */
 function terrainTexture() {
   const canvas=document.createElement('canvas');canvas.width=418;canvas.height=236;
   const context=canvas.getContext('2d'),pixels=context.createImageData(canvas.width,canvas.height),near={};
@@ -15,7 +16,7 @@ function terrainTexture() {
     const k=(y*canvas.width+x)*4;
     pixels.data[k]=water?Math.round(clamp(distance/4)*255):0;
     pixels.data[k+1]=water?0:255;
-    pixels.data[k+2]=Math.round(clamp(Math.max(0,distance)/128)*255);
+    pixels.data[k+2]=Math.round(waterDepth(wx,wy,distance)*255);
     pixels.data[k+3]=255;
   }
   context.putImageData(pixels,0,0);

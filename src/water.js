@@ -117,6 +117,10 @@ void main() {
   float movement=wet*(1.-ice*.94);
   vec2 shift=(flow*(.65+uWeather.z*.8)+uWind*gust*.9+rp.xy)*uInputSize.zw*movement;
   vec4 color=texture(uTexture,clamp(uv+shift,uInputClamp.xy,uInputClamp.zw));
+  float depth=terrain.b;
+  vec3 shallow=color.rgb*vec3(1.025,1.012,.96);
+  vec3 deep=color.rgb*vec3(.63,.79,.85)+vec3(.005,.018,.024);
+  color.rgb=mix(color.rgb,mix(shallow,deep,depth),wet);
   // Two smooth spatial scales bend the light network into flowing curves.
   vec2 w=localWorld/192.;
   w+=vec2(sin(w.y*2.2+t*.19)+sin(w.x*1.6-w.y+t*.11),cos(w.x*2.1-t*.15)+sin(w.y*1.7+w.x-t*.13))*.36;

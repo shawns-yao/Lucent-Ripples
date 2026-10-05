@@ -1,4 +1,5 @@
 import { isWater, isOpenWater, shoreDistance, ROCKS } from './pond-surface.js';
+import { waterDepth } from './pond-layout.js';
 export const TAU = Math.PI * 2;
 export const WORLD = { width: 1672, height: 941 };
 // World units/second. Cruise pace is roughly twice the original 22–41 range;
@@ -25,6 +26,8 @@ export class PondSimulation {
       f.nextRestAt=3+f.motionRandom()*21;
       f.speed=f.motionState==='rest'?0:baseSpeed*f.paceMultiplier;
       f.vx=f.speed===0?0:Math.cos(angle)*f.speed;f.vy=f.speed===0?0:Math.sin(angle)*f.speed;
+      f.waterDepth=waterDepth(f.x,f.y,shoreDistance(f.x,f.y).distance);
+      f.submergence=f.waterDepth*(.3+f.depth*.4);
       return f;
     });
     this.previous=this.fish.map(()=>({x:0,y:0,vx:0,vy:0,angle:0,group:0}));this.boundaryHint={};
@@ -84,6 +87,9 @@ export class PondSimulation {
     for(let i=0;i<this.fish.length;i++){const f=this.fish[i],p=old[i];p.x=f.x;p.y=f.y;p.vx=f.vx;p.vy=f.vy;p.angle=f.angle;p.group=f.group;}
     for(let i=0;i<this.fish.length;i++) {
       const f=this.fish[i], p=old[i];
+      f.waterDepth=waterDepth(f.x,f.y,shoreDistance(f.x,f.y,this.boundaryHint).distance);
+      const submerged=f.waterDepth*(.3+f.depth*.4+.08*Math.sin(this.time*.13+f.phase));
+      f.submergence+=(submerged-f.submergence)*Math.min(1,dt*.7);
       if(f.target && (this.time>f.leaveAt||this.time-f.target.created>f.target.life)) f.target=null;
       const interested=Boolean(f.target&&this.time>=f.reactionTime);
       this.updateMotion(f,interested);
