@@ -17,7 +17,7 @@ const candidateLabel = (city) => uniqueNames([city.name, city.admin2, city.admin
 // Keep the parent in the live status: 朝阳 alone is ambiguous across cities.
 const locationLabel = (city) => uniqueNames([city.admin2 || city.admin1, city.name]).join(' · ');
 
-export function setupWeatherUI(weather, growth) {
+export function setupWeatherUI(weather, growth, onChange = () => {}) {
   const status = document.querySelector('#weather-status');
   const summary = document.querySelector('#weather-summary');
   const buttons = [...document.querySelectorAll('[data-weather]')];
@@ -63,12 +63,14 @@ export function setupWeatherUI(weather, growth) {
     lookupAttributions = [];
     setStatus('演示天气 · 未获取位置或真实天气');
     updateSummary();
+    onChange();
   }
   buttons.forEach((button) => listen(button, 'click', () => demo(button.dataset.weather)));
   function setTime(mode) {
     if (!['auto', 'day', 'night'].includes(mode)) return;
     weather.timeMode = mode;
     document.querySelectorAll('[data-time]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.time === mode)));
+    onChange();
   }
   document.querySelectorAll('[data-time]').forEach((button) => listen(button, 'click', () => setTime(button.dataset.time)));
   function renderCredit(attributions = []) {
@@ -145,6 +147,7 @@ export function setupWeatherUI(weather, growth) {
       weatherAttributions = data.attribution || data.weather.metadata?.attributions || [];
       renderCredit([...lookupAttributions, ...(Array.isArray(weatherAttributions) ? weatherAttributions : [])]);
       updateSummary();
+      onChange();
     } catch (error) {
       if (run !== token || error.name === 'AbortError') return;
       setStatus(`${error.message}。${weather.source === 'live' ? '保留' + (displayedLocation?.name || '上次') + '的天气画面' : '继续显示演示天气'}，也可手动填写城市和区县`);
