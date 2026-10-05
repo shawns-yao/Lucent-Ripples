@@ -48,7 +48,8 @@ export function setupSceneClock(summary) {
       const live = weather.source === 'live';
       weatherText.textContent = weather.target.label + (live ? ` ${Math.round(weather.target.temp)}°` : '');
       seasonText.textContent = {spring:'春日',summer:'盛夏',autumn:'秋日',winter:'冬日'}[weather.season] || '';
-      sourceText.textContent = live ? '当地' : '演示';
+      sourceText.textContent = live ? '当地' : '';
+      sourceText.hidden = !live;
       const preset = weather.preset || (weather.target.snow > 0 ? 'snow' : weather.target.rain > 0 ? 'rain' : weather.target.cloud > .5 ? 'cloudy' : 'clear');
       const paths = {
         clear: ['M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10', 'M12 1v2m0 18v2M1 12h2m18 0h2M4 4l2 2m12 12 2 2M4 20l2-2M18 6l2-2'],
