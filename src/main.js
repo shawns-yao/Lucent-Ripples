@@ -156,7 +156,7 @@ function updateSky(date=new Date()){
  }
  shore.season=seasons.current(date,climate.winter);life.seasonWinter=shore.season==='winter';
  climate.season=shore.season;climate.seasonWinter=shore.season==='winter';climate.updatePlants();
- if(sim.season!==shore.season){sim.setSeason(shore.season);if(!canPan)app.canvas.setAttribute('aria-label',`水光粼粼的池塘，${sim.activeFish.length} 条鱼儿游动。点击活水吸引附近的鱼`);}
+ if(sim.season!==shore.season||sim.fishDensity!==wallpaper.fishDensity){sim.setSeason(shore.season,wallpaper.fishDensity);if(!canPan)app.canvas.setAttribute('aria-label',`水光粼粼的池塘，${sim.activeFish.length} 条鱼儿游动。点击活水吸引附近的鱼`);}
  if(shownWinter!==climate.seasonWinter){
    shownWinter=climate.seasonWinter;
    bg.texture=shownWinter?activeStyle.winterBottom:activeStyle.bottom;
@@ -279,6 +279,7 @@ wallpaper.attach({
    if(changed.fit)fit();
    if(changed.fps){app.ticker.maxFPS=wallpaper.fps;budget.resetClock();}
    if(changed.interaction===false)cancelGesture();
+   if(Object.hasOwn(changed,'fishdensity'))refreshScene();
  },
  playback:syncPlayback,
 });

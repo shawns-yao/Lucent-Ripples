@@ -1,6 +1,6 @@
 const params = new URLSearchParams(location.search);
 const enabled = document.documentElement.dataset.wallpaper === 'true' || params.has('wallpaper');
-const options = { style: 'cartoon', weather: 'clear', time: 'auto', season: 'auto', fit: 'fill', fps: 30, interaction: true };
+const options = { style: 'cartoon', weather: 'clear', time: 'auto', season: 'auto', fit: 'fill', fps: 30, interaction: true, fishdensity: 100 };
 const choices = {
   style: ['cartoon', 'natural'], weather: ['clear', 'cloudy', 'rain', 'snow', 'wind'],
   time: ['auto', 'day', 'night'], season: ['auto', 'spring', 'summer', 'autumn', 'winter'],
@@ -14,6 +14,7 @@ export const wallpaper = {
   get fps() { return enabled ? Math.min(options.fps, hostFPS || options.fps) : 60; },
   get hostPaused() { return hostPaused; },
   get interactive() { return !enabled || options.interaction; },
+  get fishDensity() { return enabled ? options.fishdensity / 100 : 1; },
   attach(callbacks) {
     if (!enabled) return;
     adapter = callbacks;
@@ -33,8 +34,15 @@ if (enabled) {
         const property = properties['pond' + key];
         if (!property) continue;
         let value = property.value;
-        if (key === 'fps') value = Number(value);
-        if (key === 'interaction' ? typeof value !== 'boolean' : !choices[key].includes(value)) continue;
+        if (key === 'fishdensity') {
+          if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') continue;
+          value = Number(value);
+          if (!Number.isFinite(value)) continue;
+          value = Math.round(Math.max(0, Math.min(100, value)));
+        } else {
+          if (key === 'fps') value = Number(value);
+          if (key === 'interaction' ? typeof value !== 'boolean' : !choices[key].includes(value)) continue;
+        }
         if (options[key] !== value) { options[key] = value; changed[key] = value; }
       }
       if (Object.keys(changed).length) adapter?.apply(changed);

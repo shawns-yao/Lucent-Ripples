@@ -29,7 +29,8 @@
         "order": 5, "text": "帧率上限", "type": "combo", "value": "30",
         "options": [{ "label": "30 帧", "value": "30" }, { "label": "60 帧", "value": "60" }]
       },
-      "pondinteraction": { "order": 6, "text": "鼠标互动与拖动", "type": "bool", "value": true }
+      "pondinteraction": { "order": 6, "text": "鼠标互动与拖动", "type": "bool", "value": true },
+      "pondfishdensity": { "order": 7, "text": "鱼群数量（季节默认值的百分比）", "type": "slider", "value": 100, "min": 0, "max": 100, "fraction": false }
     }
   }
 }

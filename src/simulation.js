@@ -40,9 +40,9 @@ export class PondSimulation {
     [...this.fish].sort((a,b)=>(a.id*17)%44-(b.id*17)%44).forEach((f,rank)=>f.seasonRank=rank);
     this.activeFish=this.fish;
   }
-  setSeason(season){
-    if(this.season===season)return;
-    this.season=season;const count=seasonProfile(season).fish;
+  setSeason(season,density=1){
+    if(this.season===season&&this.fishDensity===density)return;
+    this.season=season;this.fishDensity=density;const count=Math.round(seasonProfile(season).fish*density);
     for(const f of this.fish){
       f.active=f.seasonRank<count;
       if(!f.active){f.speed=0;f.vx=0;f.vy=0;f.target=null;}
