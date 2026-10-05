@@ -98,6 +98,41 @@ export async function runBrowserChecks(ui) {
   return {type:'定向测试',checks,pause,running,performance};
 }
 
+// 定向测试：沿用已启动的页面，观察真实巡游、网格预算和簇群，不推进内部时钟。
+export async function runCompositionChecks(ui){
+  const wasPaused=await ui.read('window.__pond.paused');
+  if(wasPaused)await ui.click('#pause');
+  const samples=await ui.read(`new Promise(resolve=>{
+    const result=[];let count=0;
+    const timer=setInterval(()=>{
+      const state=window.__pond.snapshot();
+      result.push({state,neighbors:window.__pond.neighborBudget(),wakes:window.__pond.surfaceMotion(),
+        fishOnWater:state.fish.every(f=>window.__pond.waterAt(f.x,f.y)),
+        wakesOnWater:window.__pond.surfaceMotion().active.every(p=>window.__pond.surfaceAt(p.x,p.y)==='water')});
+      if(++count===30){clearInterval(timer);resolve(result);}
+    },200);
+  })`);
+  if(wasPaused)await ui.click('#pause');
+  for(const sample of samples){
+    assert.equal(sample.state.fish.length,44);assert.equal(sample.fishOnWater,true);
+    assert.ok(sample.state.fish.every(f=>[f.x,f.y,f.speed,f.submergence].every(Number.isFinite)));
+    assert.ok(sample.neighbors.checks<sample.neighbors.allPairs);
+    assert.ok(sample.wakes.active.length<=sample.wakes.capacity);assert.equal(sample.wakesOnWater,true);
+  }
+  const groups=new Map();
+  for(const f of samples[0].state.fish.filter(f=>f.schooling))groups.set(f.group,(groups.get(f.group)||0)+1);
+  assert.ok([...groups.values()].every(n=>n>=2&&n<=4));
+  assert.ok(samples.some(s=>s.wakes.active.some(p=>p.kind==='fish')));
+  const plants=await ui.read('window.__pond.growth()'),display=await ui.read('window.__pond.plantsDisplay()');
+  assert.equal(new Set(plants.map(p=>p.cluster)).size,2);
+  for(const cluster of [0,1])assert.ok(display.plants.filter(p=>p.flowerVisible&&plants[p.id].cluster===cluster).length<=2);
+  assert.equal(await ui.read('window.__pond.plantsDisplay().companions.every(p=>window.__pond.surfaceAt(p.x,p.y)==="leaf")'),true);
+  assert.equal(await ui.read('window.__pond.meshBudget().batchedFish'),44);
+  return {type:'定向测试',samples:samples.length,groups:[...groups.values()],solitary:samples[0].state.fish.filter(f=>!f.schooling).length,
+    meanNeighborChecks:samples.reduce((sum,s)=>sum+s.neighbors.checks,0)/samples.length,allPairs:samples[0].neighbors.allPairs,
+    maxWakes:Math.max(...samples.map(s=>s.wakes.active.length)),companions:display.companions.length};
+}
+
 async function runLocal() {
   const {chromium}=await import('@playwright/test');
   const browser=await chromium.launch({channel:'msedge',headless:process.env.POND_TEST_HEADLESS==='1'});
@@ -106,13 +141,14 @@ async function runLocal() {
     const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];
     page.on('pageerror',error=>errors.push(error.message));
     await page.goto(process.env.POND_TEST_URL||'http://127.0.0.1:5173/');
-    const result=await runBrowserChecks({
+    const ui={
       read:expression=>page.evaluate(expression),click:selector=>page.locator(selector).click(),
       key:(selector,key)=>page.locator(selector).press(key),size:size=>page.setViewportSize(size),
       wait:ms=>page.waitForTimeout(ms),reload:()=>page.reload(),
       capture:name=>page.screenshot({path:join(output,`${name}.png`)}),
-    });
-    assert.deepEqual(errors,[]);console.log(JSON.stringify(result,null,2));
+    };
+    const result=await runBrowserChecks(ui),composition=await runCompositionChecks(ui);
+    assert.deepEqual(errors,[]);console.log(JSON.stringify({result,composition},null,2));
   } finally {await browser.close();}
 }
 if(typeof process!=='undefined'&&process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url)await runLocal();
