@@ -1,6 +1,7 @@
 import { rng, WORLD } from './simulation.js';
 import { isOpenWater, isWater, PAINTED_PADS } from './pond-surface.js';
 import { LOTUS_SITES } from './pond-layout.js';
+import { seasonProfile } from './season-profile.js';
 export const DAY_MS=86400000;
 export const LOTUS_STORAGE_KEY='stillwater.lotus.v1';
 export const LOTUS_STAGES=Object.freeze({youngLeaf:1,openLeaf:3,bud:7,halfOpen:10,fullBloom:12});
@@ -9,8 +10,9 @@ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 function browserStorage(){try{return globalThis.localStorage??null;}catch{return null;}}
 function freshSeed(){try{const a=new Uint32Array(1);globalThis.crypto.getRandomValues(a);return a[0];}catch{return Math.floor(Math.random()*4294967296);}}
 export function lotusStage(age){return age<0?'dormant':age<1?'emerging':age<3?'young-leaf':age<7?'open-leaf':age<10?'bud':age<12?'half-open':'full-bloom';}
-export function lotusAppearance(age){
-  return {visible:age>=0,leafStage:clamp(age<1?age:1+(age-1)/2,0,2),leafScale:clamp(.16+age/6*.84,.16,1),bloomStage:clamp(age<10?(age-7)/3:1+(age-10)/2,0,2),bloomScale:clamp((age-7)/.8,0,1)};
+export function lotusAppearance(age,season='summer'){
+  const profile=seasonProfile(season);
+  return {visible:age>=0&&profile.leafScale>0,leafStage:clamp(age<1?age:1+(age-1)/2,0,2),leafScale:clamp(.16+age/6*.84,.16,1)*profile.leafScale,bloomStage:Math.min(profile.bloomStage,clamp(age<10?(age-7)/3:1+(age-10)/2,0,2)),bloomScale:clamp((age-7)/.8,0,1)*profile.bloomScale};
 }
 function validStored(raw){
   if(!raw||![1,2].includes(raw.schema)||!Number.isInteger(raw.seed)||!Number.isFinite(raw.createdAt)||!Number.isFinite(raw.lastSeenAt)||!Array.isArray(raw.plants)||raw.plants.length!==MAX_LOTUS)return false;

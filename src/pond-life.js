@@ -169,12 +169,12 @@ export class PondLife {
       f.alpha+=(active-f.alpha)*Math.min(1,dt*1.6);f.group.alpha=f.alpha*light;f.group.visible=f.group.alpha>.015;
       f.group.visible=f.group.visible&&!this.seasonWinter&&!this.climate.winter&&weather.temp>=6;
       if(active>.25||f.state==='jump'||f.state==='prepare') {
-        if(active>.25&&f.state==='rest'&&(time>=f.until||!this.flowerClear(f.x,f.y)))this.jump(f,time);
+        if(active>.25&&f.state==='rest'&&(time>=f.until||!this.flowerClear(f.x,f.y)||(f.landing==='leaf'&&this.climate.surfaceAt(f.x,f.y)!=='leaf')))this.jump(f,time);
         if(f.state==='prepare'){f.elapsed+=dt;if(f.elapsed>=f.preparation){f.state='jump';f.elapsed=0;}}
         if(f.state==='jump') {
           f.elapsed+=dt;const p=clamp(f.elapsed/f.duration);
           f.x=f.startX+(f.targetX-f.startX)*p;f.y=f.startY+(f.targetY-f.startY)*p;f.height=Math.sin(p*Math.PI)*f.jumpHeight;
-          if(p>=1){f.height=0;f.jumpCount++;if(f.landing==='water'){f.state='swim';this.splash(f.x,f.y,time);this.swimTarget(f,time);}else{if(f.fromWater)f.waterExitCount++;f.state='settle';f.elapsed=0;f.until=time+4+this.random()*8;}}
+          if(p>=1){f.height=0;f.jumpCount++;if(f.landing==='leaf'&&this.climate.surfaceAt(f.x,f.y)==='water')f.landing='water';if(f.landing==='water'){f.state='swim';this.splash(f.x,f.y,time);this.swimTarget(f,time);}else{if(f.fromWater)f.waterExitCount++;f.state='settle';f.elapsed=0;f.until=time+4+this.random()*8;}}
         } else if(f.state==='swim') {
           if(time>f.until||(f.perch&&!this.landingFree(f,f.perch.x,f.perch.y)))this.swimTarget(f,time);
           const dx=f.targetX-f.x,dy=f.targetY-f.y,d=Math.hypot(dx,dy),speed=(32+Math.sin(time*5+f.phase)*10)*dt;

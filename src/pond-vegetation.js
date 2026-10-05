@@ -1,6 +1,7 @@
 import { Container, MeshSimple } from 'pixi.js';
 import { isWater } from './pond-surface.js';
 import { ecologyArt } from './ecology-art.js';
+import { seasonProfile } from './season-profile.js';
 
 const PATCHES=[[290,330],[337,382],[320,623],[430,714],[1255,365],[1390,405],[1354,610],[1190,790]];
 export class PondVegetation {
@@ -31,15 +32,16 @@ export class PondVegetation {
       }
     }
     const dt=Math.max(0,Math.min(.1,time-(this.lastTime??time)));this.lastTime=time;
-    const winter=season==='winter',autumn=season==='autumn';
-    const tint=winter?0x8c8469:autumn?0x9c9f67:this.style==='cartoon'?0x8cbe6d:0xa2b985;
+    const winter=season==='winter',autumn=season==='autumn',profile=seasonProfile(season);
+    const tint=winter?0x8c8469:autumn?0xc6a160:season==='spring'?0xb8d786:this.style==='cartoon'?0x8cbe6d:0xa2b985;
     for(const p of this.patches){
       p.response+=(p.influence-p.response)*Math.min(1,dt*4);
-      for(const b of p.blades){
+      for(let i=0;i<p.blades.length;i++){const b=p.blades[i];
         const mesh=b.mesh,v=mesh.vertices;
+        mesh.visible=i<profile.grassBlades;if(!mesh.visible)continue;
         for(let j=0;j<7;j++){
           const u=j/6,bend=Math.sin(time*.72+b.phase+u*1.8)*u*u*(1.2+weather.wind*.16)+(Math.sin(time*3.1+b.phase)*p.response*5)*u*u;
-          for(let side=0;side<2;side++){const k=(j*2+side)*2;v[k]=b.base[k]+bend;v[k+1]=b.base[k+1]*(winter?.67:1);}
+          for(let side=0;side<2;side++){const k=(j*2+side)*2;v[k]=b.base[k]+bend*(winter?.12:1);v[k+1]=b.base[k+1]*profile.grassScale;}
         }
         mesh.tint=tint;mesh.alpha=winter?.3:this.style==='cartoon'?.76:.7;
       }

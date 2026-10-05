@@ -60,7 +60,11 @@ export function ecologyArt(style){
   c.save();c.translate(384,0);
   const petal=c.createLinearGradient(8,4,23,41);petal.addColorStop(0,'#fae6df');petal.addColorStop(.65,cartoon?'#f1b1b7':'#d8b3b4');petal.addColorStop(1,'#b88b95');
   c.fillStyle=petal;c.beginPath();c.moveTo(17,42);c.bezierCurveTo(-2,24,5,1,14,3);c.bezierCurveTo(35,5,28,29,17,42);c.fill();line([[15,10],[17,35]],'rgba(249,229,219,.6)',1);c.restore();
+  c.save();c.translate(384,64);
+  const autumn=c.createLinearGradient(4,5,27,37);autumn.addColorStop(0,'#e2bd6c');autumn.addColorStop(.55,'#ba823a');autumn.addColorStop(1,'#78522e');
+  c.fillStyle=autumn;c.beginPath();c.moveTo(17,3);c.bezierCurveTo(32,12,30,29,15,41);c.bezierCurveTo(2,29,1,14,17,3);c.fill();
+  line([[17,5],[16,22],[14,45]],'#e9cd8e',.8);for(let i=0;i<3;i++)line([[16,14+i*7],[7,10+i*8]],'#dac080',.6);c.restore();
   const texture=Texture.from(canvas),frame=(x,y,width,height)=>new Texture({source:texture.source,frame:new Rectangle(x,y,width,height)});
-  const result={grass:frame(0,0,96,160),dragon:frame(128,0,96,32),wing:frame(128,48,96,32),hindwing:frame(128,96,96,32),bee:frame(128,176,96,48),beeWing:frame(256,96,96,32),shrimp:frame(256,0,96,48),petal:frame(384,0,32,48)};
+  const result={grass:frame(0,0,96,160),dragon:frame(128,0,96,32),wing:frame(128,48,96,32),hindwing:frame(128,96,96,32),bee:frame(128,176,96,48),beeWing:frame(256,96,96,32),shrimp:frame(256,0,96,48),petal:frame(384,0,32,48),autumnLeaf:frame(384,64,32,48)};
   cache.set(style,result);return result;
 }

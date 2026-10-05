@@ -18,6 +18,7 @@ import { SurfaceMotion } from './surface-motion.js';
 import { PondVegetation } from './pond-vegetation.js';
 import { PondEcology } from './pond-ecology.js';
 import { createWinterRemnants } from './winter-scene.js';
+import { seasonProfile } from './season-profile.js';
 import './style.css';
 const host=document.querySelector('#pond');
 const app=new Application();
@@ -62,7 +63,7 @@ const pads=new Sprite(initialStyle.surface.texture);pads.width=WORLD.width;pads.
 let surfaceOcclusion=initialStyle.surface,activeStyle=initialStyle,shownWinter=null;
 const lotus=new LotusVisuals(world,initialStyle.lotus,growth,shadows);
 const winterRemnants=createWinterRemnants(world);
-const water=createWaterFilter(climate.texture,moonTexture,initialStyle.surface.texture);world.filters=[water];world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
+const water=createWaterFilter(climate.texture,moonTexture,initialStyle.surface.foliage);world.filters=[water];world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
 // Tiny bits of drifting pollen lend depth without turning the water into a particle effect.
 const motes=new Container();world.addChild(motes);
 const shoreWorld=new Container();app.stage.addChild(shoreWorld);
@@ -89,7 +90,7 @@ function applySceneStyle(style){
  lotus.setStyle(style.lotus);life.setStyle(style.life);
  vegetation.setStyle(style.key);ecology.setStyle(style.key);
  water.resources.waterUniforms.uniforms.uStyle=style.key==='cartoon'?1:0;
- water.resources.uSurface=style.surface.texture.source;
+ water.resources.uSurface=style.surface.foliage.source;
 }
 applySceneStyle(initialStyle);
 const appearance=setupSceneStyle(initialStyle,style=>{applySceneStyle(style);refreshScene();});
@@ -130,7 +131,7 @@ function fit(){
  // Pixi applies the container transform to filterArea: keep it in local units.
  world.filterArea=new Rectangle(0,0,WORLD.width,WORLD.height);
  app.canvas.style.cursor=canPan?'grab':'default';
- app.canvas.setAttribute('aria-label',canPan?'水光粼粼的池塘，拖动或使用方向键查看全景，轻点水面吸引鱼群':'水光粼粼的池塘，44 条鱼儿自由游动。点击水面投下涟漪，吸引附近的鱼');
+ app.canvas.setAttribute('aria-label',canPan?'水光粼粼的池塘，拖动或使用方向键查看全景，轻点水面吸引鱼群':`水光粼粼的池塘，${sim.activeFish.length} 条鱼儿游动。点击活水吸引附近的鱼`);
  document.querySelector('#hint span').textContent=canPan?'拖动浏览，轻点水面互动':'轻点水面，等鱼儿游来';
  app.renderer.resolution=renderResolution();app.renderer.resize(innerWidth,innerHeight);
  if(paused)refreshScene();
@@ -154,12 +155,13 @@ function updateSky(date=new Date()){
    }
  }
  shore.season=seasons.current(date,climate.winter);life.seasonWinter=shore.season==='winter';
- climate.seasonWinter=shore.season==='winter';climate.updatePlants();
+ climate.season=shore.season;climate.seasonWinter=shore.season==='winter';climate.updatePlants();
+ if(sim.season!==shore.season){sim.setSeason(shore.season);if(!canPan)app.canvas.setAttribute('aria-label',`水光粼粼的池塘，${sim.activeFish.length} 条鱼儿游动。点击活水吸引附近的鱼`);}
  if(shownWinter!==climate.seasonWinter){
    shownWinter=climate.seasonWinter;
    bg.texture=shownWinter?activeStyle.winterBottom:activeStyle.bottom;
    surfaceOcclusion=shownWinter?activeStyle.winterSurface:activeStyle.surface;
-   pads.texture=surfaceOcclusion.texture;water.resources.uSurface=surfaceOcclusion.texture.source;
+   pads.texture=surfaceOcclusion.texture;water.resources.uSurface=activeStyle.surface.foliage.source;
    bg.width=pads.width=WORLD.width;bg.height=pads.height=WORLD.height;winterRemnants.visible=shownWinter;
  }
  const key=JSON.stringify([weather.timeMode,weather.location]);
@@ -171,12 +173,12 @@ function updateSky(date=new Date()){
 }
 function updateLife(w=weather.forScene()){
  lotus.update(sim.time,w,shore.season);shore.snowCover=climate.snowCover;shore.winterAmount=climate.winterAmount;shore.update(sim.time,w);life.update(sim.time,w);
- vegetation.update(sim.time,w,shore.season,sim.fish);ecology.update(sim.time,w,shore.season,sim.fish);
+ vegetation.update(sim.time,w,shore.season,sim.activeFish);ecology.update(sim.time,w,shore.season,sim.activeFish);
 }
 function updateVisuals(updateAnimals=true){
  updateSky();
  sim.fish.forEach((f,i)=>{
-   const {mesh,shadow}=visuals[i];deform(mesh,f);shadow.vertices.set(mesh.vertices);
+   const {mesh,shadow}=visuals[i];mesh.visible=shadow.visible=f.active;if(!f.active)return;deform(mesh,f);shadow.vertices.set(mesh.vertices);
    const clearance=Math.max(0,f.waterDepth-f.submergence);
    shadow.position.set(mesh.x+4+clearance*19,mesh.y+5+clearance*25);shadow.rotation=mesh.rotation;
    shadow.scale.set(1+clearance*.16);shadow.alpha=.17-clearance*.18;
@@ -184,10 +186,11 @@ function updateVisuals(updateAnimals=true){
  });
  const u=water.resources.waterUniforms.uniforms;u.uTime=sim.time;
  u.uWinter=shore.season==='winter'?1:0;
+ u.uSeason=seasonProfile(shore.season).index;
  const w=weather.forScene();u.uWeather[0]=w.cloud;u.uWeather[1]=w.light;u.uWeather[2]=w.wind/12;u.uWeather[3]=w.snow;u.uWind[0]=w.windX;u.uWind[1]=w.windY;
  u.uClimate[0]=climate.iceLevel;u.uClimate[1]=climate.snowCover;u.uClimate[2]=budget.quality;u.uClimate[3]=w.temp;
  climate.updatePlants();
- surfaceMotion.update(sim.time,sim.fish,climate,w);
+ surfaceMotion.update(sim.time,sim.activeFish,climate,w);
  for(let i=0;i<6;i++){const p=surfaceMotion.records[i],values=u['uWake'+i];values[0]=p.x;values[1]=p.y;values[2]=p.created;values[3]=p.strength;}
  for(let i=0;i<8;i++){const leaf=climate.leaves[i],values=u['uLeaf'+i];values[0]=leaf.x;values[1]=leaf.y;values[2]=leaf.radius;}
  if(updateAnimals)updateLife(w);
@@ -202,7 +205,7 @@ function updateVisuals(updateAnimals=true){
  for(let i=0;i<5;i++){
    const a=sim.attractors[i],values=u['uRipple'+i];values[0]=a?.x||0;values[1]=a?.y||0;values[2]=a?a.created:-100;values[3]=a?1:0;
  }
- for(const p of pollen){const x=((p.x+sim.time*(1.6+w.windX*6))%WORLD.width+WORLD.width)%WORLD.width,y=p.y+Math.sin(sim.time*.18+p.phase)*7+Math.sin(sim.time*.07+p.phase)*w.windY*6;p.sprite.position.set(x,y);p.sprite.visible=!climate.seasonWinter&&isWater(x,y);}
+ for(let i=0;i<pollen.length;i++){const p=pollen[i],x=((p.x+sim.time*(1.6+w.windX*6))%WORLD.width+WORLD.width)%WORLD.width,y=p.y+Math.sin(sim.time*.18+p.phase)*7+Math.sin(sim.time*.07+p.phase)*w.windY*6;p.sprite.position.set(x,y);p.sprite.visible=i<seasonProfile(shore.season).pollen&&isWater(x,y);}
 }
 app.ticker.maxFPS=wallpaper.fps;
 app.ticker.add(t=>{
@@ -285,6 +288,7 @@ window.__pond.winterScene=()=>({active:shownWinter,remnants:winterRemnants.visib
 window.__pond.flowerObstacles=()=>lotus.flowerObstacles.map(p=>({...p}));
 window.__pond.appearance=()=>appearance.snapshot();
 window.__pond.seasons=()=>seasons.snapshot();
+window.__pond.seasonScene=()=>({season:shore.season,profile:{...seasonProfile(shore.season)},activeFish:sim.activeFish.length,visibleFish:visuals.filter(v=>v.mesh.visible).length,fish:sim.fish.map((f,i)=>({id:f.id,active:f.active,visible:visuals[i].mesh.visible,x:f.x,y:f.y,speed:f.speed,depth:f.submergence/Math.max(.01,f.waterDepth)})),leafRadii:climate.leaves.map(p=>p.radius)});
 window.__pond.precipitationBudget=()=>({season:atmosphere.frame.season,rainBudget:atmosphere.frame.rainBudget,rainCount:atmosphere.frame.rainCount,snowCount:atmosphere.frame.snowCount,drawnRain:atmosphere.rain.particleChildren.length,drawnSnow:atmosphere.snow.particleChildren.length,rings:atmosphere.frame.impacts.length});
 window.__pond.meshBudget=()=>({fishVertices:(COLS+1)*(ROWS+1),batchedFish:visuals.filter(v=>v.mesh.batched).length});
 window.__pond.neighborBudget=()=>({checks:sim.neighborChecks,allPairs:sim.fish.length*(sim.fish.length-1),cells:sim.gridHeads.length});

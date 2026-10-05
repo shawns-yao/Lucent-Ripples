@@ -2,7 +2,7 @@ import { Container, Graphics, Sprite, Texture, Rectangle, Particle, ParticleCont
 import { precipitationFrame, createPrecipitationFrame, PRECIPITATION_PARTICLES, RAIN_PARTICLE_LIMIT, SNOW_PARTICLE_LIMIT } from './precipitation.js';
 import { lotusAppearance } from './lotus-growth.js';
 import { rng } from './simulation.js';
-import { createFoliageFilter } from './tree-seasons.js';
+import { seasonProfile } from './season-profile.js';
 import { COMPANION_PADS } from './pond-layout.js';
 
 function snowTextures() {
@@ -76,8 +76,6 @@ export class WeatherEffects {
 export class LotusVisuals {
   constructor(world, atlas, growth, shadowLayer){
     this.container=new Container();world.addChild(this.container);this.growth=growth;
-    this.winterFilter=createFoliageFilter();
-    this.winterFilter.resources.seasonUniforms.uniforms.uFoliage=[.89,.73,.49,1];
     this.textureSets=new Map();this.setStyle(atlas);
     this.shadows=new Container();shadowLayer.addChild(this.shadows);
     this.companionLayer=new Container();this.container.addChild(this.companionLayer);
@@ -119,15 +117,18 @@ export class LotusVisuals {
   }
   update(time,weather,season='summer'){
     const changed=this.season!==season;this.season=season;const dormant=season==='winter';
-    if(changed)this.companionLayer.filters=dormant?[this.winterFilter]:null;
+    if(changed)this.companionLayer.filters=null;
     this.companionLayer.visible=!dormant;
     for(const {shadow} of this.companions)shadow.visible=!dormant;
     const blossoms=[0,0];
-    this.growth.plants.forEach((p,i)=>{const v=this.plants[i],{visible,leafScale:size,leafStage,bloomStage,bloomScale}=lotusAppearance(p.age);v.group.visible=visible&&!dormant;
+    const tint=seasonProfile(season).leafTint;
+    for(const {leaf} of this.companions)leaf.tint=tint;
+    this.growth.plants.forEach((p,i)=>{const v=this.plants[i],{visible,leafScale:size,leafStage,bloomStage,bloomScale}=lotusAppearance(p.age,season);v.group.visible=visible&&!dormant;
       v.group.x=p.x+Math.sin(time*.6+p.phase)*weather.wind*.26;v.group.y=p.y+Math.cos(time*.5+p.phase)*weather.wind*.15;
       v.leaves.rotation=Math.sin(time*.48+p.phase)*(.012+weather.wind*.003);v.leaves.scale.set((82/this.textures[0].width)*size);
-      if(changed)v.leaves.filters=dormant?[this.winterFilter]:null;
-      v.flower.visible=!dormant&&blossoms[p.cluster]<2;
+      if(changed)v.leaves.filters=null;
+      v.underlay.tint=tint;for(const leaf of v.leafSprites)leaf.tint=tint;
+      v.flower.visible=bloomScale>0&&blossoms[p.cluster]<2;
       if(visible&&bloomScale>0&&v.flower.visible)blossoms[p.cluster]++;
       v.underlay.texture=this.textures[Math.floor(leafStage)];
       v.leafSprites.forEach((s,n)=>{s.alpha=Math.max(0,1-Math.abs(leafStage-n));});
@@ -139,5 +140,5 @@ export class LotusVisuals {
       const obstacle=this.flowerObstacles[i];obstacle.x=v.group.x+12;obstacle.y=v.group.y-14;obstacle.radius=v.group.visible&&v.flower.visible?25*bloomScale:0;
     });
   }
-  snapshot(){return {season:this.season,dormant:this.season==='winter',companions:this.companions.map(({leaf})=>({x:leaf.x,y:leaf.y,width:leaf.width,height:leaf.height,withered:Boolean(this.companionLayer.filters?.length)})),plants:this.plants.map((v,i)=>({id:this.growth.plants[i].id,visible:v.group.visible,flowerVisible:v.group.visible&&v.flower.visible&&v.flower.scale.x>0,withered:Boolean(v.leaves.filters?.length)}))};}
+  snapshot(){return {season:this.season,dormant:this.season==='winter',companions:this.companions.map(({leaf})=>({x:leaf.x,y:leaf.y,width:leaf.width,height:leaf.height,tint:leaf.tint,withered:this.season==='winter'||this.season==='autumn'})),plants:this.plants.map((v,i)=>({id:this.growth.plants[i].id,visible:v.group.visible,leafScale:v.leaves.scale.x,flowerVisible:v.group.visible&&v.flower.visible&&v.flower.scale.x>0,flowerScale:v.flower.scale.x,withered:this.season==='winter'||this.season==='autumn'}))};}
 }

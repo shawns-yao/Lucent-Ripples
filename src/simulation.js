@@ -1,5 +1,6 @@
 import { isWater, isOpenWater, shoreDistance, ROCKS, STATIC_PADS } from './pond-surface.js';
 import { waterDepth, QUIET_WATER } from './pond-layout.js';
+import { seasonProfile } from './season-profile.js';
 export const TAU = Math.PI * 2;
 export const WORLD = { width: 1672, height: 941 };
 // World units/second. Cruise pace is roughly twice the original 22–41 range;
@@ -19,7 +20,7 @@ export class PondSimulation {
       const schooling=id<SCHOOL_IDS.length,group=schooling?SCHOOL_IDS[id]:id;
       const c=HABITATS[group%HABITATS.length],a=r()*TAU,d=Math.sqrt(r())*(schooling?55:155);
       const angle=r()*TAU, baseSpeed=FISH_MOTION.minBaseSpeed+r()*(FISH_MOTION.maxBaseSpeed-FISH_MOTION.minBaseSpeed);
-      const f={id,x:clamp(c[0]+Math.cos(a)*d,70,width-70),y:clamp(c[1]+Math.sin(a)*d,60,height-60),angle,vx:0,vy:0,speed:baseSpeed,baseSpeed,length:20+r()*22,phase:r()*TAU,tailPhase:r()*TAU,group,schooling,variant:id%6,depth:r(),sociability:schooling?.85+r()*.4:.12+r()*.15,turnRate:1.2+r()*.9,curiosity:.55+r()*.45,target:null,reactionTime:0,leaveAt:0,turn:0,
+      const f={id,active:true,x:clamp(c[0]+Math.cos(a)*d,70,width-70),y:clamp(c[1]+Math.sin(a)*d,60,height-60),angle,vx:0,vy:0,speed:baseSpeed,baseSpeed,length:20+r()*22,phase:r()*TAU,tailPhase:r()*TAU,group,schooling,variant:id%6,depth:r(),sociability:schooling?.85+r()*.4:.12+r()*.15,turnRate:1.2+r()*.9,curiosity:.55+r()*.45,target:null,reactionTime:0,leaveAt:0,turn:0,
         // A private random stream keeps one fish's decisions independent of the
         // others' pauses and of unrelated rendering calls to sim.random().
         motionRandom:rng(Math.floor(r()*4294967296)),motionState:'cruise',paceMultiplier:1,motionUntil:0,nextRestAt:0,restCount:0,wakeCount:0};
@@ -36,6 +37,17 @@ export class PondSimulation {
     this.previous=this.fish.map(()=>({x:0,y:0,vx:0,vy:0,angle:0,group:0}));this.boundaryHint={};
     this.cellSize=180;this.gridColumns=Math.ceil(width/this.cellSize);this.gridRows=Math.ceil(height/this.cellSize);
     this.gridHeads=new Int32Array(this.gridColumns*this.gridRows);this.gridNext=new Int32Array(count);this.neighborChecks=0;
+    [...this.fish].sort((a,b)=>(a.id*17)%44-(b.id*17)%44).forEach((f,rank)=>f.seasonRank=rank);
+    this.activeFish=this.fish;
+  }
+  setSeason(season){
+    if(this.season===season)return;
+    this.season=season;const count=seasonProfile(season).fish;
+    for(const f of this.fish){
+      f.active=f.seasonRank<count;
+      if(!f.active){f.speed=0;f.vx=0;f.vy=0;f.target=null;}
+    }
+    this.activeFish=this.fish.filter(f=>f.active);
   }
   setMotion(f,state) {
     const r=f.motionRandom;
@@ -88,7 +100,7 @@ export class PondSimulation {
     if(this.surface?(!isWater(x,y,2)||this.surface.surfaceAt(x,y)!=='water'):!isOpenWater(x,y,2))return {selected:0,x,y,accepted:false};
     const point={x,y,created:this.time,id:++this.clicks,life:14};
     this.attractors.push(point); if(this.attractors.length>5) this.attractors.shift();
-    const candidates=this.fish.map(f=>({f,d:Math.hypot(f.x-x,f.y-y)})).filter(v=>v.d<420).sort((a,b)=>a.d-b.d);
+    const candidates=this.activeFish.map(f=>({f,d:Math.hypot(f.x-x,f.y-y)})).filter(v=>v.d<420).sort((a,b)=>a.d-b.d);
     let selected=0;
     for(const {f,d} of candidates) {
       if(selected>=16) break;
@@ -109,11 +121,13 @@ export class PondSimulation {
     for(let i=0;i<this.fish.length;i++){const f=this.fish[i],p=old[i];p.x=f.x;p.y=f.y;p.vx=f.vx;p.vy=f.vy;p.angle=f.angle;p.group=f.group;}
     this.gridHeads.fill(-1);this.neighborChecks=0;
     for(let i=0;i<old.length;i++){
+      if(!this.fish[i].active)continue;
       const p=old[i],cx=clamp(Math.floor(p.x/this.cellSize),0,this.gridColumns-1),cy=clamp(Math.floor(p.y/this.cellSize),0,this.gridRows-1),cell=cy*this.gridColumns+cx;
       this.gridNext[i]=this.gridHeads[cell];this.gridHeads[cell]=i;
     }
     for(let i=0;i<this.fish.length;i++) {
       const f=this.fish[i], p=old[i];
+      if(!f.active)continue;
       const boundary=shoreDistance(f.x,f.y,this.boundaryHint);
       f.waterDepth=waterDepth(f.x,f.y,boundary.distance);
       const winter=this.surface?.seasonWinter;

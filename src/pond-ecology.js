@@ -37,7 +37,7 @@ export class PondEcology {
   setStyle(style){
     this.style=style;this.art=ecologyArt(style);
     for(const s of this.shrimp||[])s.sprite.texture=this.art.shrimp;
-    for(const p of this.petals||[])p.sprite.texture=this.art.petal;
+    for(const p of this.petals||[])p.sprite.texture=p.kind==='leaf'?this.art.autumnLeaf:this.art.petal;
     for(const d of this.dragonflies||[]){d.body.texture=this.art.dragon;for(let j=0;j<4;j++)d.wings[j].texture=j<2?this.art.wing:this.art.hindwing;}
   }
   water(x,y){return this.climate.surfaceAt(x,y)==='water';}
@@ -67,6 +67,7 @@ export class PondEcology {
     const dt=clamp(time-this.lastTime,0,.1);this.lastTime=time;
     const cold=season==='winter'||this.climate.winter,calm=clamp(1-weather.rain*1.8-weather.snow*2)*clamp(1-(weather.wind-5)/8);
     const day=cold?0:clamp((weather.light-.28)/.45)*calm;
+    if(this.season!==season){for(const p of this.petals){p.active=false;p.sprite.visible=false;}this.nextPetal=time+1;}
     this.activeDay=day;this.season=season;
     for(const s of this.shrimp){
       s.sprite.visible=!cold;
@@ -86,10 +87,14 @@ export class PondEcology {
     else if(time>=this.nextPetal&&dt>0){
       this.nextPetal=time+6+this.random()*4;
       let f=null,available=0;
-      for(const flower of this.flowers)if(flower.available&&this.random()<1/++available)f=flower;
+      if(season==='autumn'){
+        const sites=[[320,360],[1370,345],[1280,755]],site=sites[Math.floor(this.random()*sites.length)];f={x:site[0],y:site[1]};
+      }else for(const flower of this.flowers)if(flower.available&&this.random()<1/++available)f=flower;
       for(let i=0;f&&i<6;i++){
         const a=this.random()*TAU,x=f.x-12+Math.cos(a)*47,y=f.y+Math.sin(a)*47;if(!this.water(x,y))continue;
-        const p=this.petals[this.petalCursor++%this.petals.length];p.x=x;p.y=y;p.born=time;p.life=30+this.random()*14;p.active=true;break;
+        const p=this.petals[this.petalCursor++%this.petals.length];p.x=x;p.y=y;p.born=time;p.life=30+this.random()*14;p.active=true;
+        p.kind=season==='autumn'?'leaf':'petal';p.sprite.texture=p.kind==='leaf'?this.art.autumnLeaf:this.art.petal;
+        p.sprite.width=p.kind==='leaf'?8+p.id%3:3.5+p.id%3;p.sprite.height=p.kind==='leaf'?13+p.id%3:6+p.id%3;break;
       }
     }
     for(const p of this.petals){
@@ -125,7 +130,7 @@ export class PondEcology {
   snapshot(){
     return {season:this.season,activeDay:this.activeDay,
       shrimp:this.shrimp.map(s=>({id:s.id,x:s.x,y:s.y,homeX:s.homeX,homeY:s.homeY,state:s.state,darts:s.darts,visible:s.sprite.visible})),
-      petals:this.petals.map(p=>({id:p.id,x:p.x,y:p.y,born:p.born,active:p.active,visible:p.sprite.visible})),
+      petals:this.petals.map(p=>({id:p.id,x:p.x,y:p.y,born:p.born,kind:p.kind||'petal',active:p.active,visible:p.sprite.visible})),
       dragonflies:this.dragonflies.map(d=>({id:d.id,x:d.x,y:d.y,height:d.height,screenY:d.group.y,shadowY:d.shadow.y,state:d.state,targetX:d.targetX,targetY:d.targetY,visible:d.group.visible}))};
   }
 }

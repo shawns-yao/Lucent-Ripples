@@ -55,6 +55,14 @@ export function createSurfaceOcclusion(bottom, style, includeLeaves=true) {
     if(!coverage[k])data[k*4+3]=0;
   }
   context.putImageData(pixels,0,0);
-  return {texture:Texture.from(canvas),leafPixels,
+  // A small leaf-only mask excludes rocks from seasonal recoloring.
+  const mask=document.createElement('canvas');mask.width=418;mask.height=236;
+  const mc=mask.getContext('2d'),mp=mc.createImageData(mask.width,mask.height);
+  for(let y=0;y<mask.height;y++)for(let x=0;x<mask.width;x++){
+    const value=coverage[Math.min(940,Math.floor((y+.5)*941/236))*1672+Math.floor((x+.5)*4)],k=(y*mask.width+x)*4;
+    mp.data[k]=value===1||value===2?255:0;mp.data[k+3]=255;
+  }
+  mc.putImageData(mp,0,0);
+  return {texture:Texture.from(canvas),foliage:Texture.from(mask),leafPixels,
     at(x,y){return context.getImageData(Math.max(0,Math.min(1671,Math.floor(x))),Math.max(0,Math.min(940,Math.floor(y))),1,1).data[3]/255;}};
 }

@@ -26,6 +26,7 @@ uniform mediump vec4 uOutputFrame;
 uniform float uTime;
 uniform float uStyle;
 uniform float uWinter;
+uniform float uSeason;
 uniform vec2 uWorld;
 uniform vec2 uOrigin;
 uniform vec4 uClimate; // ice, settled snow, rendering quality, temperature
@@ -127,7 +128,13 @@ void main() {
   vec3 shallow=color.rgb*vec3(1.025,1.012,.96);
   vec3 deep=color.rgb*vec3(.63,.79,.85)+vec3(.005,.018,.024);
   color.rgb=mix(color.rgb,mix(shallow,deep,depth),wet);
-  color.rgb=mix(color.rgb,color.rgb*vec3(.82,.94,1.06),uWinter*wet*.6);
+  vec3 seasonWater=uSeason<.5?vec3(.95,1.08,.96):uSeason<1.5?vec3(1.):uSeason<2.5?vec3(1.14,.99,.80):vec3(.78,.90,1.06);
+  color.rgb=mix(color.rgb,color.rgb*seasonWater,wet*.85);
+  float foliage=texture(uSurface,clamp(localWorld/vec2(1672.,941.),0.,1.)).r*(1.-uWinter);
+  float leafLight=dot(color.rgb,vec3(.28,.57,.15));
+  vec3 leafColor=uSeason<.5?vec3(.88,1.24,.54):vec3(1.25,.85,.32);
+  float leafChange=uSeason<.5?.42:uSeason>1.5?.84:0.;
+  color.rgb=mix(color.rgb,leafLight*leafColor,foliage*leafChange);
   // Two smooth spatial scales bend the light network into flowing curves.
   vec2 w=localWorld/192.;
   w+=vec2(sin(w.y*2.2+t*.19)+sin(w.x*1.6-w.y+t*.11),cos(w.x*2.1-t*.15)+sin(w.y*1.7+w.x-t*.13))*.36;
@@ -177,12 +184,18 @@ void main() {
   color.rgb+=vec3(.82,.89,.91)*moonLight*movement;
   // Thin translucent ice retains some bottom detail and subdued light below it.
   float cloud=noise(localWorld*.013+vec2(23.,8.));
-  float vein=abs(sin(localWorld.x*.018+localWorld.y*.027+noise(localWorld*.024)*3.));
-  float crack=(1.-smoothstep(.006,.024,vein))*smoothstep(.55,.76,noise(localWorld*.009+19.));
+  vec2 crackCell=floor(localWorld/155.),crackHash=hash22(crackCell),cp=fract(localWorld/155.)-.5;
+  float angle=crackHash.x*6.28318;vec2 axis=vec2(cos(angle),sin(angle));
+  float along=dot(cp,axis),across=abs(dot(cp,vec2(-axis.y,axis.x)));
+  float crack=(1.-smoothstep(.0015,.005,across))*(1.-smoothstep(.17,.34,abs(along)))*step(.67,crackHash.y);
   float frost=pow(noise(localWorld*.045),5.)*.07+pow(noise(localWorld*.19),7.)*.015;
-  vec3 iceColor=vec3(.65,.76,.79)*(.32+.68*uWeather.y);
-  color.rgb=mix(color.rgb,iceColor,ice*(.55+cloud*.3));
-  color.rgb+=vec3(.73,.84,.87)*(frost+crack*.14)*ice*(.25+.75*uWeather.y);
+  vec3 iceColor=vec3(.66,.78,.83)*(.32+.68*uWeather.y);
+  float iceCoverage=smoothstep(.27,.31,ice);
+  float opacity=.34+cloud*.13+smoothstep(.45,.9,ice)*.25;
+  color.rgb=mix(color.rgb,iceColor,iceCoverage*opacity);
+  float rim=iceCoverage*(1.-smoothstep(.32,.39,ice));
+  color.rgb+=vec3(.59,.73,.79)*rim*.28*(.25+.75*uWeather.y);
+  color.rgb+=vec3(.73,.84,.87)*(frost+crack*.22)*iceCoverage*(.25+.75*uWeather.y);
   float ground=1.-wet;
   float settled=ground*uClimate.y*(.08+.34*pow(noise(localWorld*.075),2.));
   settled+=ice*max(uClimate.y,uWinter*.22)*pow(grain,3.)*.32;
@@ -191,6 +204,7 @@ void main() {
 }`;
 export function createWaterFilter(terrain,moonTexture,surface) {
  const uniforms={uTime:{value:0,type:'f32'},uStyle:{value:0,type:'f32'},uWinter:{value:0,type:'f32'},uWorld:{value:[1672,941],type:'vec2<f32>'},uOrigin:{value:[0,0],type:'vec2<f32>'},uClimate:{value:[0,0,1,20],type:'vec4<f32>'},uWeather:{value:[.08,1,.1,0],type:'vec4<f32>'},uWind:{value:[0,0],type:'vec2<f32>'},uMoon:{value:[1000,280,0,1],type:'vec4<f32>'},uSun:{value:[835,350,1,.5],type:'vec4<f32>'}};
+ uniforms.uSeason={value:1,type:'f32'};
  for(let i=0;i<8;i++)uniforms['uLeaf'+i]={value:[0,0,0,0],type:'vec4<f32>'};
  for(let i=0;i<5;i++) uniforms['uRipple'+i]={value:[0,0,-100,0],type:'vec4<f32>'};
  for(let i=0;i<6;i++) uniforms['uWake'+i]={value:[0,0,-100,0],type:'vec4<f32>'};
