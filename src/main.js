@@ -184,20 +184,20 @@ function updateVisuals(updateAnimals=true){
    shadow.scale.set(1+clearance*.16);shadow.alpha=.17-clearance*.18;
    mesh.alpha=(.96-f.submergence*(climate.seasonWinter?.65:.26))*(1-climate.iceAt(f.x,f.y)*.65);
  });
- const u=water.resources.waterUniforms.uniforms;u.uTime=sim.time;
+ const u=water.resources.waterUniforms.uniforms;u.uTime=sim.time;const effects=wallpaper.effectStrength;u.uEffects=effects;
  u.uWinter=shore.season==='winter'?1:0;
  u.uSeason=seasonProfile(shore.season).index;
  const w=weather.forScene();u.uWeather[0]=w.cloud;u.uWeather[1]=w.light;u.uWeather[2]=w.wind/12;u.uWeather[3]=w.snow;u.uWind[0]=w.windX;u.uWind[1]=w.windY;
  const twilight=Math.max(0,1-Math.abs(sky.sun.altitude-.035)/.22);
  const seasonalMist=[.15,.08,.18,.12][u.uSeason];
- u.uMist=seasonalMist*(.18+twilight*.82)*(1-Math.min(1,w.wind/9))*(1-w.rain*.85)*(1+.15*Math.sin(sim.time*.025));
+ u.uMist=seasonalMist*(.18+twilight*.82)*(1-Math.min(1,w.wind/9))*(1-w.rain*.85)*(1+.15*Math.sin(sim.time*.025))*effects;
  u.uClimate[0]=climate.iceLevel;u.uClimate[1]=climate.snowCover;u.uClimate[2]=budget.quality;u.uClimate[3]=w.temp;
  climate.updatePlants();
  surfaceMotion.update(sim.time,sim.activeFish,climate,w);
  for(let i=0;i<6;i++){const p=surfaceMotion.records[i],values=u['uWake'+i];values[0]=p.x;values[1]=p.y;values[2]=p.created;values[3]=p.strength;}
  for(let i=0;i<8;i++){const leaf=climate.leaves[i],values=u['uLeaf'+i];values[0]=leaf.x;values[1]=leaf.y;values[2]=leaf.radius;}
  if(updateAnimals)updateLife(w);
- const precipitation=atmosphere.update(sim.time,w,view,growth.plants,budget.quality,seasons.selected());
+ const precipitation=atmosphere.update(sim.time,w,view,growth.plants,budget.quality*effects,seasons.selected());
  // Real sky directions map into this fixed north-up pond. An explicit preview
  // illustrates a visible moon inside the viewport, including narrow screens.
  const moonX=sky.isPreview?WORLD.width*.54+Math.sin(sim.time/130)*125:sky.moon.reflection.x*WORLD.width;
@@ -208,7 +208,7 @@ function updateVisuals(updateAnimals=true){
  for(let i=0;i<5;i++){
    const a=sim.attractors[i],values=u['uRipple'+i];values[0]=a?.x||0;values[1]=a?.y||0;values[2]=a?a.created:-100;values[3]=a?1:0;
  }
- for(let i=0;i<pollen.length;i++){const p=pollen[i],x=((p.x+sim.time*(1.6+w.windX*6))%WORLD.width+WORLD.width)%WORLD.width,y=p.y+Math.sin(sim.time*.18+p.phase)*7+Math.sin(sim.time*.07+p.phase)*w.windY*6;p.sprite.position.set(x,y);p.sprite.visible=i<seasonProfile(shore.season).pollen&&isWater(x,y);}
+ for(let i=0;i<pollen.length;i++){const p=pollen[i],x=((p.x+sim.time*(1.6+w.windX*6))%WORLD.width+WORLD.width)%WORLD.width,y=p.y+Math.sin(sim.time*.18+p.phase)*7+Math.sin(sim.time*.07+p.phase)*w.windY*6;p.sprite.position.set(x,y);p.sprite.visible=i<Math.round(seasonProfile(shore.season).pollen*effects)&&isWater(x,y);}
 }
 app.ticker.maxFPS=wallpaper.fps;
 app.ticker.add(t=>{
@@ -279,7 +279,7 @@ wallpaper.attach({
    if(changed.fit)fit();
    if(changed.fps){app.ticker.maxFPS=wallpaper.fps;budget.resetClock();}
    if(changed.interaction===false)cancelGesture();
-   if(Object.hasOwn(changed,'fishdensity'))refreshScene();
+   if(Object.hasOwn(changed,'fishdensity')||changed.effects)refreshScene();
  },
  playback:syncPlayback,
 });
@@ -302,6 +302,6 @@ window.__pond.surfaceMotion=()=>({capacity:surfaceMotion.records.length,active:s
 window.__pond.ecology=()=>({...ecology.snapshot(),vegetation:vegetation.snapshot(),waterPasses:world.filters.length});
 window.__pond.occlusion=()=>({leafPixels:surfaceOcclusion.leafPixels,probes:[[405,522],[580,750],[192,198],[450,522],[879,864]].map(([x,y])=>({x,y,alpha:surfaceOcclusion.at(x,y)}))});
 window.__pond.landings=()=>({flowers:lotus.flowerSites.map(p=>({...p})),butterflies:shore.butterflies.map(b=>({id:b.index,state:b.state,x:b.x,y:b.y,height:b.height,perch:b.perchKind,flowerId:b.flowerId,targetX:b.targetX,targetY:b.targetY,screenY:b.sprite.y,shadowY:b.shadow.y,landings:b.landingCount||0,flowerVisits:b.flowerVisits||0}))});
-window.__pond.wallpaper=()=>({...wallpaper.snapshot(),tickerRunning:app.ticker.started,tickerFPS:app.ticker.maxFPS});
+window.__pond.wallpaper=()=>({...wallpaper.snapshot(),effectStrength:wallpaper.effectStrength,particleQuality:budget.quality*wallpaper.effectStrength,tickerRunning:app.ticker.started,tickerFPS:app.ticker.maxFPS});
 if(params.has('still')){togglePause();document.querySelector('#hint').classList.add('quiet');}
 else syncPlayback();

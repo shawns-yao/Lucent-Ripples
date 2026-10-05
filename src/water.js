@@ -29,6 +29,7 @@ uniform float uStyle;
 uniform float uWinter;
 uniform float uSeason;
 uniform float uMist;
+uniform float uEffects;
 uniform vec2 uWorld;
 uniform vec2 uOrigin;
 uniform vec4 uClimate; // ice, settled snow, rendering quality, temperature
@@ -139,7 +140,7 @@ void main() {
   w+=vec2(sin(w.y*2.2+t*.19)+sin(w.x*1.6-w.y+t*.11),cos(w.x*2.1-t*.15)+sin(w.y*1.7+w.x-t*.13))*.36;
   w+=vec2(sin(w.y*4.7-t*.21),cos(w.x*4.2+t*.17))*.09;
   float caustic=0.,broad=0.;
-  if(uStyle<.5){
+  if(uStyle<.5&&uEffects>.5){
     float line=abs(sin(w.x*2.5+sin(w.y*1.8)*1.6)+sin(w.y*2.9-w.x*.6)*.42);
     caustic=exp(-line*mix(15.,24.,uClimate.z))*.046;
     broad=exp(-line*6.0)*.012;
@@ -148,7 +149,7 @@ void main() {
   float ribbon=exp(-abs(curved)*mix(54.,32.,uStyle))*noise(localWorld*.008+vec2(t*.015,0.))*mix(.025,.014,uStyle);
   float patch=smoothstep(.35,.72,noise(world*.004+vec2(t*.012,-t*.007)));
   float modulation=patch*(1.-depth*.72)*(.5+.5*(.5+.5*sin(world.x*.005+world.y*.007-t*.22)));
-  color.rgb+=vec3(.73,.91,.64)*((caustic+broad)+ribbon)*modulation*(1.-uWeather.x*.85)*uWeather.y*movement;
+  color.rgb+=vec3(.73,.91,.64)*((caustic+broad)+ribbon)*modulation*(1.-uWeather.x*.85)*uWeather.y*movement*uEffects;
   color.rgb+=vec3(.77,.89,.77)*rp.z*movement;
   color.rgb=mix(color.rgb,vec3(.26,.51,.45),.055);
   float vignette=smoothstep(.9,.25,length((screenUV-.5)*vec2(1.,.9)));
@@ -164,7 +165,7 @@ void main() {
   float spot=exp(-dot(point*vec2(1.,1.8),point*vec2(1.,1.8))*125.);
   float flicker=pow(max(0.,sin(t*(1.1+h.x)+h.y*60.)),8.);
   float sunshine=uSun.z*uWeather.y;
-  color.rgb+=vec3(1.,.95,.72)*spot*flicker*(.025+sunPool*.72)*sunshine*movement*mix(1.,.55,uStyle);
+  color.rgb+=vec3(1.,.95,.72)*spot*flicker*(.025+sunPool*.72)*sunshine*movement*mix(1.,.55,uStyle)*uEffects;
   // Curved, broken wave crests form a long specular path across the water.
   vec2 moon=world-uMoon.xy;
   moon.x+=sin(world.y*.042+t*1.3)*(2.+uWeather.z*4.)+flow.x*1.6;
@@ -187,7 +188,7 @@ void main() {
   float coreBreak=.28+.72*noise(moon*vec2(.06,.17)+vec2(t*.12,-t*.26));
   float halo=exp(-pow(moon.x/58.,2.)-pow(moon.y/95.,2.))*.024;
   float moonLight=(path*(fragments*1.45+crestGlow)+center*coreBreak*(.035+reference*.04)+halo)*uMoon.w*nightVisibility;
-  color.rgb+=vec3(.96,.97,.88)*moonLight*movement;
+  color.rgb+=vec3(.96,.97,.88)*moonLight*movement*mix(.55,1.,uEffects);
   // Sample solid ice once in world space: its fractures never drift with water.
   vec3 iceMaterial=texture(uIceTexture,clamp(localWorld/vec2(1672.,941.),0.,1.)).rgb;
   float crystal=smoothstep(.56,.86,dot(iceMaterial,vec3(.25,.6,.15)));
@@ -218,6 +219,7 @@ export function createWaterFilter(terrain,moonTexture,surface,iceTexture) {
  const uniforms={uTime:{value:0,type:'f32'},uStyle:{value:0,type:'f32'},uWinter:{value:0,type:'f32'},uWorld:{value:[1672,941],type:'vec2<f32>'},uOrigin:{value:[0,0],type:'vec2<f32>'},uClimate:{value:[0,0,1,20],type:'vec4<f32>'},uWeather:{value:[.08,1,.1,0],type:'vec4<f32>'},uWind:{value:[0,0],type:'vec2<f32>'},uMoon:{value:[1000,280,0,1],type:'vec4<f32>'},uSun:{value:[835,350,1,.5],type:'vec4<f32>'}};
  uniforms.uSeason={value:1,type:'f32'};
  uniforms.uMist={value:0,type:'f32'};
+ uniforms.uEffects={value:1,type:'f32'};
  for(let i=0;i<8;i++)uniforms['uLeaf'+i]={value:[0,0,0,0],type:'vec4<f32>'};
  for(let i=0;i<5;i++) uniforms['uRipple'+i]={value:[0,0,-100,0],type:'vec4<f32>'};
  for(let i=0;i<6;i++) uniforms['uWake'+i]={value:[0,0,-100,0],type:'vec4<f32>'};

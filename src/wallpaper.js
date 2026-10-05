@@ -1,10 +1,11 @@
 const params = new URLSearchParams(location.search);
 const enabled = document.documentElement.dataset.wallpaper === 'true' || params.has('wallpaper');
-const options = { style: 'cartoon', weather: 'clear', time: 'auto', season: 'auto', fit: 'fill', fps: 30, interaction: true, fishdensity: 100 };
+const options = { style: 'cartoon', weather: 'clear', time: 'auto', season: 'auto', fit: 'fill', fps: 30, interaction: true, fishdensity: 100, effects: 'high' };
 const choices = {
   style: ['cartoon', 'natural'], weather: ['clear', 'cloudy', 'rain', 'snow', 'wind'],
   time: ['auto', 'day', 'night'], season: ['auto', 'spring', 'summer', 'autumn', 'winter'],
   fit: ['fill', 'fit'], fps: [30, 60],
+  effects: ['low', 'medium', 'high'],
 };
 let hostFPS = 0, hostPaused = false, adapter = null;
 
@@ -15,6 +16,7 @@ export const wallpaper = {
   get hostPaused() { return hostPaused; },
   get interactive() { return !enabled || options.interaction; },
   get fishDensity() { return enabled ? options.fishdensity / 100 : 1; },
+  get effectStrength() { return !enabled || options.effects === 'high' ? 1 : options.effects === 'medium' ? .65 : .35; },
   attach(callbacks) {
     if (!enabled) return;
     adapter = callbacks;
