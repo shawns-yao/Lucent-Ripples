@@ -14,12 +14,14 @@ import { setupTreeSeasons } from './tree-seasons.js';
 import { LOTUS_STORAGE_KEY } from './lotus-growth.js';
 import { celestialAt } from './celestial.js';
 import { wallpaper } from './wallpaper.js';
+import { SurfaceMotion } from './surface-motion.js';
 import './style.css';
 const host=document.querySelector('#pond');
 const app=new Application();
 const sim=new PondSimulation();
 const weather=new WeatherState(),growth=new LotusGrowth();
 const climate=new PondClimate(growth.plants),budget=new FrameBudget();sim.surface=climate;
+const surfaceMotion=new SurfaceMotion();
 const renderResolution=()=>Math.min(devicePixelRatio||1,1.5,2560/Math.max(innerWidth,innerHeight),Math.sqrt(2600000*budget.quality/Math.max(1,innerWidth*innerHeight)));
 const TILT=.9; // A gentle 2.5D oblique overhead projection, not a full 3D camera.
 let paused=false,ready=false,frames=0,lastClick=null,sky=null,skyKey="",skyCheckedAt=0;
@@ -167,6 +169,8 @@ function updateVisuals(updateAnimals=true){
  const w=weather.forScene();u.uWeather[0]=w.cloud;u.uWeather[1]=w.light;u.uWeather[2]=w.wind/12;u.uWeather[3]=w.snow;u.uWind[0]=w.windX;u.uWind[1]=w.windY;
  u.uClimate[0]=climate.freeze;u.uClimate[1]=climate.snowCover;u.uClimate[2]=budget.quality;u.uClimate[3]=w.temp;
  climate.updatePlants();
+ surfaceMotion.update(sim.time,sim.fish,climate,w);
+ for(let i=0;i<6;i++){const p=surfaceMotion.records[i],values=u['uWake'+i];values[0]=p.x;values[1]=p.y;values[2]=p.created;values[3]=p.strength;}
  for(let i=0;i<8;i++){const leaf=climate.leaves[i],values=u['uLeaf'+i];values[0]=leaf.x;values[1]=leaf.y;values[2]=leaf.radius;}
  if(updateAnimals)updateLife(w);
  const precipitation=atmosphere.update(sim.time,w,view,growth.plants,budget.quality,seasons.selected());
@@ -264,6 +268,7 @@ window.__pond.seasons=()=>seasons.snapshot();
 window.__pond.precipitationBudget=()=>({season:atmosphere.frame.season,rainBudget:atmosphere.frame.rainBudget,rainCount:atmosphere.frame.rainCount,snowCount:atmosphere.frame.snowCount,drawnRain:atmosphere.rain.particleChildren.length,drawnSnow:atmosphere.snow.particleChildren.length,rings:atmosphere.frame.impacts.length});
 window.__pond.meshBudget=()=>({fishVertices:(COLS+1)*(ROWS+1),batchedFish:visuals.filter(v=>v.mesh.batched).length});
 window.__pond.neighborBudget=()=>({checks:sim.neighborChecks,allPairs:sim.fish.length*(sim.fish.length-1),cells:sim.gridHeads.length});
+window.__pond.surfaceMotion=()=>({capacity:surfaceMotion.records.length,active:surfaceMotion.snapshot(sim.time)});
 window.__pond.occlusion=()=>({leafPixels:surfaceOcclusion.leafPixels,probes:[[405,522],[580,750],[192,198],[450,522],[879,864]].map(([x,y])=>({x,y,alpha:surfaceOcclusion.at(x,y)}))});
 window.__pond.landings=()=>({flowers:lotus.flowerSites.map(p=>({...p})),butterflies:shore.butterflies.map(b=>({id:b.index,state:b.state,x:b.x,y:b.y,height:b.height,perch:b.perchKind,flowerId:b.flowerId,targetX:b.targetX,targetY:b.targetY,screenY:b.sprite.y,shadowY:b.shadow.y,landings:b.landingCount||0,flowerVisits:b.flowerVisits||0}))});
 window.__pond.wallpaper=()=>({...wallpaper.snapshot(),tickerRunning:app.ticker.started,tickerFPS:app.ticker.maxFPS});

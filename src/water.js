@@ -63,22 +63,24 @@ uniform vec4 uRipple1;
 uniform vec4 uRipple2;
 uniform vec4 uRipple3;
 uniform vec4 uRipple4;
+uniform vec4 uWake0;
+uniform vec4 uWake1;
+uniform vec4 uWake2;
+uniform vec4 uWake3;
+uniform vec4 uWake4;
+uniform vec4 uWake5;
 vec2 hash22(vec2 p) { vec3 p3=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));p3+=dot(p3,p3.yzx+33.33);return fract((p3.xx+p3.yz)*p3.zy); }
 float noise(vec2 p) {
   vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
   return mix(mix(hash22(i).x,hash22(i+vec2(1.,0.)).x,f.x),mix(hash22(i+vec2(0.,1.)).x,hash22(i+1.).x,f.x),f.y);
 }
 float leafMask(vec2 p,vec4 leaf) { return leaf.z>0.?1.-smoothstep(leaf.z-3.,leaf.z+3.,length(p-leaf.xy)):0.; }
-float cells(vec2 p,float t) {
-  vec2 n=floor(p),f=fract(p);float a=8.,b=8.;
-  for(int j=-1;j<=1;j++)for(int i=-1;i<=1;i++){
-    if(uClimate.z<.8&&(i<0||j<0))continue;
-    vec2 g=vec2(float(i),float(j));vec2 r=hash22(n+g);
-    vec2 o=.5+.32*sin(t*.31+6.283185*r);
-    float d=length(g+o-f);
-    if(d<a){b=a;a=d;}else if(d<b){b=d;}
-  }
-  return b-a;
+vec3 wake(vec2 p,vec4 r){
+  float age=uTime-r.z;
+  if(r.w<=0.||age<0.||age>2.4)return vec3(0.);
+  vec2 delta=p-r.xy;float d=length(delta),front=d-(3.+age*12.);
+  float wave=sin(front*.85)*exp(-front*front*.12)*sin(age/2.4*3.14159)*r.w;
+  return vec3(delta/max(d,1.)*wave*.45,wave*.025);
 }
 vec3 ripple(vec2 p,vec4 r) {
   float age=uTime-r.z;
@@ -112,6 +114,7 @@ void main() {
   float t=uTime;
   vec2 flow=vec2(sin(world.y*.011+t*.42)+sin(world.y*.024-world.x*.008-t*.23),cos(world.x*.01+t*.36)+sin(world.y*.013+world.x*.009+t*.31));
   vec3 rp=ripple(world,uRipple0)+ripple(world,uRipple1)+ripple(world,uRipple2)+ripple(world,uRipple3)+ripple(world,uRipple4);
+  rp+=wake(world,uWake0)+wake(world,uWake1)+wake(world,uWake2)+wake(world,uWake3)+wake(world,uWake4)+wake(world,uWake5);
   rp+=rainRipple(world,uRainImpact0)+rainRipple(world,uRainImpact1)+rainRipple(world,uRainImpact2)+rainRipple(world,uRainImpact3)+rainRipple(world,uRainImpact4)+rainRipple(world,uRainImpact5)+rainRipple(world,uRainImpact6)+rainRipple(world,uRainImpact7)+rainRipple(world,uRainImpact8)+rainRipple(world,uRainImpact9)+rainRipple(world,uRainImpact10)+rainRipple(world,uRainImpact11)+rainRipple(world,uRainImpact12)+rainRipple(world,uRainImpact13)+rainRipple(world,uRainImpact14)+rainRipple(world,uRainImpact15);
   float gust=sin(dot(world,uWind+vec2(.2,.1))*.045-t*(.9+uWeather.z));
   float movement=wet*(1.-ice*.94);
@@ -127,14 +130,15 @@ void main() {
   w+=vec2(sin(w.y*4.7-t*.21),cos(w.x*4.2+t*.17))*.09;
   float caustic=0.,broad=0.;
   if(uStyle<.5){
-    float line=cells(w,t);
-    caustic=exp(-line*42.0)*.056;
-    broad=exp(-line*14.0)*.018;
+    float line=abs(sin(w.x*2.5+sin(w.y*1.8)*1.6)+sin(w.y*2.9-w.x*.6)*.42);
+    caustic=exp(-line*mix(15.,24.,uClimate.z))*.046;
+    broad=exp(-line*6.0)*.012;
   }
   float curved=sin(localWorld.x*.017+localWorld.y*.009+sin(localWorld.y*.022-t*.18)*1.9+t*.24);
   float ribbon=exp(-abs(curved)*mix(54.,32.,uStyle))*noise(localWorld*.008+vec2(t*.015,0.))*mix(.025,.014,uStyle);
-  float modulation=.45+.55*(.5+.5*sin(world.x*.005+world.y*.007-t*.45));
-  color.rgb+=vec3(.73,.91,.64)*((caustic+broad)*modulation+ribbon)*(1.-uWeather.x*.85)*uWeather.y*movement;
+  float patch=smoothstep(.35,.72,noise(world*.004+vec2(t*.012,-t*.007)));
+  float modulation=patch*(1.-depth*.72)*(.5+.5*(.5+.5*sin(world.x*.005+world.y*.007-t*.22)));
+  color.rgb+=vec3(.73,.91,.64)*((caustic+broad)+ribbon)*modulation*(1.-uWeather.x*.85)*uWeather.y*movement;
   color.rgb+=vec3(.77,.89,.77)*rp.z*movement;
   color.rgb=mix(color.rgb,vec3(.26,.51,.45),.055);
   float vignette=smoothstep(.9,.25,length((screenUV-.5)*vec2(1.,.9)));
@@ -157,7 +161,7 @@ void main() {
   float spot=exp(-dot(point*vec2(1.,1.8),point*vec2(1.,1.8))*125.);
   float flicker=pow(max(0.,sin(t*(1.1+h.x)+h.y*60.)),8.);
   float sunshine=uSun.z*uWeather.y;
-  color.rgb+=vec3(1.,.95,.72)*spot*flicker*(.12+sunPool*.85)*sunshine*movement*mix(1.,.55,uStyle);
+  color.rgb+=vec3(1.,.95,.72)*spot*flicker*(.025+sunPool*.72)*sunshine*movement*mix(1.,.55,uStyle);
   // A broken specular footprint, not a sharp lunar photograph on the water.
   vec2 moon=world-uMoon.xy;
   moon.x+=sin(world.y*.046+t*.31)*(3.+uWeather.z*5.)+flow.x*2.;
@@ -188,6 +192,7 @@ export function createWaterFilter(terrain,moonTexture,surface) {
  const uniforms={uTime:{value:0,type:'f32'},uStyle:{value:0,type:'f32'},uWinter:{value:0,type:'f32'},uWorld:{value:[1672,941],type:'vec2<f32>'},uOrigin:{value:[0,0],type:'vec2<f32>'},uClimate:{value:[0,0,1,20],type:'vec4<f32>'},uWeather:{value:[.08,1,.1,0],type:'vec4<f32>'},uWind:{value:[0,0],type:'vec2<f32>'},uMoon:{value:[1000,280,0,1],type:'vec4<f32>'},uSun:{value:[835,350,1,.5],type:'vec4<f32>'}};
  for(let i=0;i<8;i++)uniforms['uLeaf'+i]={value:[0,0,0,0],type:'vec4<f32>'};
  for(let i=0;i<5;i++) uniforms['uRipple'+i]={value:[0,0,-100,0],type:'vec4<f32>'};
+ for(let i=0;i<6;i++) uniforms['uWake'+i]={value:[0,0,-100,0],type:'vec4<f32>'};
  for(let i=0;i<16;i++) uniforms['uRainImpact'+i]={value:[0,0,-100,0],type:'vec4<f32>'};
  return new Filter({glProgram:GlProgram.from({vertex,fragment,name:'pond-water'}),resources:{waterUniforms:uniforms,uTerrain:terrain.source,uMoonTexture:moonTexture.source,uSurface:surface.source},padding:0,resolution:'inherit'});
 }
