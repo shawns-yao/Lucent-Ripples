@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { runEcologyChecks } from './ecology-browser.mjs';
 
 // 定向测试：只通过页面控件操作；观察接口只读，不改时钟或生长记录。
 // 适配器也可接入已有浏览器，复用同一组检查。
@@ -147,8 +148,8 @@ async function runLocal() {
       wait:ms=>page.waitForTimeout(ms),reload:()=>page.reload(),
       capture:name=>page.screenshot({path:join(output,`${name}.png`)}),
     };
-    const result=await runBrowserChecks(ui),composition=await runCompositionChecks(ui);
-    assert.deepEqual(errors,[]);console.log(JSON.stringify({result,composition},null,2));
+    const result=await runBrowserChecks(ui),composition=await runCompositionChecks(ui),ecology=await runEcologyChecks(ui);
+    assert.deepEqual(errors,[]);console.log(JSON.stringify({result,composition,ecology},null,2));
   } finally {await browser.close();}
 }
 if(typeof process!=='undefined'&&process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url)await runLocal();
