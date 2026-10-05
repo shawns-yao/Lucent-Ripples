@@ -177,7 +177,7 @@ export class ShoreLife {
 
   takeoffButterfly(b,time,width,height) {
     b.flowerId=null;b.perchKind=null;b.state='takeoff';b.until=time+.65;
-    const direction=b.heading+(this.random()-.5)*1.4,distance=160+this.random()*180;
+    const direction=b.heading+(this.random()-.5)*1.4,distance=75+this.random()*80;
     b.targetX=clamp(b.x+Math.cos(direction)*distance,45,width-45);
     b.targetY=clamp(b.y+Math.sin(direction)*distance,45,height-45);
   }
