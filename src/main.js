@@ -15,6 +15,8 @@ import { LOTUS_STORAGE_KEY } from './lotus-growth.js';
 import { celestialAt } from './celestial.js';
 import { wallpaper } from './wallpaper.js';
 import { SurfaceMotion } from './surface-motion.js';
+import { PondVegetation } from './pond-vegetation.js';
+import { PondEcology } from './pond-ecology.js';
 import './style.css';
 const host=document.querySelector('#pond');
 const app=new Application();
@@ -65,6 +67,8 @@ const shoreWorld=new Container();app.stage.addChild(shoreWorld);
 const shore=new ShoreLife(shoreWorld,initialStyle.shore,initialStyle.winter,initialStyle.layout);
 shore.flowerSites=lotus.flowerSites;
 const life=new PondLife(world,shoreWorld,initialStyle.life,climate,(x,y)=>shore.canopyAt(x,y));
+const vegetation=new PondVegetation(world,fishes,initialStyle.key);
+const ecology=new PondEcology({world,fishLayer:vegetation.container,shoreWorld,climate,motion:surfaceMotion,flowers:lotus.flowerSites,canopy:(x,y,clearance)=>shore.canopyAt(x,y,clearance),style:initialStyle.key});
 const atmosphere=new WeatherEffects(app.stage,climate);
 const weatherUI=setupWeatherUI(weather,growth,refreshScene);
 function applySceneStyle(style){
@@ -79,6 +83,7 @@ function applySceneStyle(style){
  }
  shore.setStyle(style.shore,style.winter,style.layout);
  lotus.setStyle(style.lotus);life.setStyle(style.life);
+ vegetation.setStyle(style.key);ecology.setStyle(style.key);
  water.resources.waterUniforms.uniforms.uStyle=style.key==='cartoon'?1:0;
  water.resources.uSurface=style.surface.texture.source;
 }
@@ -154,6 +159,7 @@ function updateSky(date=new Date()){
 }
 function updateLife(w=weather.forScene()){
  lotus.update(sim.time,w,shore.season);shore.snowCover=climate.snowCover;shore.winterAmount=climate.winterAmount;shore.update(sim.time,w);life.update(sim.time,w);
+ vegetation.update(sim.time,w,shore.season,sim.fish);ecology.update(sim.time,w,shore.season,sim.fish,life.frogs,shore.butterflies);
 }
 function updateVisuals(updateAnimals=true){
  updateSky();
@@ -269,6 +275,7 @@ window.__pond.precipitationBudget=()=>({season:atmosphere.frame.season,rainBudge
 window.__pond.meshBudget=()=>({fishVertices:(COLS+1)*(ROWS+1),batchedFish:visuals.filter(v=>v.mesh.batched).length});
 window.__pond.neighborBudget=()=>({checks:sim.neighborChecks,allPairs:sim.fish.length*(sim.fish.length-1),cells:sim.gridHeads.length});
 window.__pond.surfaceMotion=()=>({capacity:surfaceMotion.records.length,active:surfaceMotion.snapshot(sim.time)});
+window.__pond.ecology=()=>({...ecology.snapshot(),vegetation:vegetation.snapshot(),waterPasses:world.filters.length});
 window.__pond.occlusion=()=>({leafPixels:surfaceOcclusion.leafPixels,probes:[[405,522],[580,750],[192,198],[450,522],[879,864]].map(([x,y])=>({x,y,alpha:surfaceOcclusion.at(x,y)}))});
 window.__pond.landings=()=>({flowers:lotus.flowerSites.map(p=>({...p})),butterflies:shore.butterflies.map(b=>({id:b.index,state:b.state,x:b.x,y:b.y,height:b.height,perch:b.perchKind,flowerId:b.flowerId,targetX:b.targetX,targetY:b.targetY,screenY:b.sprite.y,shadowY:b.shadow.y,landings:b.landingCount||0,flowerVisits:b.flowerVisits||0}))});
 window.__pond.wallpaper=()=>({...wallpaper.snapshot(),tickerRunning:app.ticker.started,tickerFPS:app.ticker.maxFPS});
