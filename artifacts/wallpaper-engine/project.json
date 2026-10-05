@@ -163,6 +163,22 @@
             "value": "high"
           }
         ]
+      },
+      "pondclarity": {
+        "order": 9,
+        "text": "清晰度",
+        "type": "combo",
+        "value": "high",
+        "options": [
+          {
+            "label": "均衡",
+            "value": "balanced"
+          },
+          {
+            "label": "高清（最高 2K）",
+            "value": "high"
+          }
+        ]
       }
     }
   },
