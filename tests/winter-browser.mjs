@@ -61,6 +61,31 @@ export async function runSeasonChecks(ui){
   await ui.click('#weather-summary');return {type:'定向测试',results};
 }
 
+export async function runInsectSeasonChecks(ui){
+  if(await ui.read('__pond.paused'))await ui.click('#pause');
+  if(!await ui.read('document.querySelector("#weather-panel").open'))await ui.click('#weather-summary');
+  await ui.click('[data-weather="clear"]');
+  const results=[];
+  for(const season of ['autumn','winter','spring','summer']){
+    await ui.click(`[data-season="${season}"]`);
+    for(const time of ['day','night']){
+      await ui.click(`[data-time="${time}"]`);
+      for(let i=0;i<40;i++){
+        const light=await ui.read('__pond.weather().current.light');
+        if(time==='day'?light>.65:light<.35)break;
+        await ui.wait(200);
+      }
+      const visible=await ui.read('({bees:__pond.shoreLife().beesVisible,butterflies:__pond.shoreLife().butterfliesVisible,fireflies:__pond.shoreLife().firefliesVisible,dragonflies:__pond.ecology().dragonflies.filter(d=>d.visible).length})');
+      if(season==='autumn'||season==='winter')assert.ok(Object.values(visible).every(n=>n===0));
+      else if(time==='day'){assert.ok(visible.butterflies>0&&visible.dragonflies>0);assert.equal(visible.fireflies,0);}
+      else assert.ok(visible.fireflies>0);
+      results.push({season,time,...visible});
+    }
+  }
+  await ui.click('[data-season="winter"]');await ui.click('[data-time="day"]');await ui.click('#weather-summary');
+  return {type:'定向测试',results};
+}
+
 export async function runFrogFlowerChecks(ui){
   if(await ui.read('__pond.paused'))await ui.click('#pause');
   if(!await ui.read('document.querySelector("#weather-panel").open'))await ui.click('#weather-summary');

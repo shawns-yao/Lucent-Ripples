@@ -264,8 +264,9 @@ export class ShoreLife {
     const cloud = clamp(finite(weather.cloud, 0));
     const calm = clamp(1 - rain * 1.35 - snow * 1.6) * clamp(1 - (wind - 5) / 12);
     const cold=this.season==='winter'||weather.temp<6||(this.winterAmount||0)>.1;
-    const day = cold?0:clamp((light - .22) / .52) * calm;
-    const night = cold?0:clamp((.43 - light) / .29) * clamp(1 - rain * 1.3 - snow * 1.5);
+    const dormant=cold||this.season==='autumn';
+    const day = dormant?0:clamp((light - .22) / .52) * calm;
+    const night = dormant?0:clamp((.43 - light) / .29) * clamp(1 - rain * 1.3 - snow * 1.5);
     this.activity.day = day;
     this.activity.night = night;
     const illumination = clamp((light - .08) / .92) * (1 - cloud * .14);
@@ -305,6 +306,7 @@ export class ShoreLife {
     for(let i=0;i<2;i++){this.treeShadows[i].position.copyFrom(this.trees[i].group.position);this.treeShadows[i].alpha=shadowAlpha;}
 
     for (const bee of this.bees) {
+      if(dormant){bee.sprite.visible=bee.shadow.visible=false;continue;}
       if(day>.005&&dt>0)this.flyBee(bee,time,dt);
       const sprite = bee.sprite;
       const resting=bee.state==='rest',hidden=bee.state==='hive';
@@ -322,6 +324,7 @@ export class ShoreLife {
     }
 
     for (const butterfly of this.butterflies) {
+      if(dormant){butterfly.sprite.visible=butterfly.shadow.visible=false;continue;}
       if(day>.005)this.flyButterfly(butterfly,time,dt,width,height);
       const sprite = butterfly.sprite;
       sprite.position.set(butterfly.x,butterfly.y-butterfly.height);

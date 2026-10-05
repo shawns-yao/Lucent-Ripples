@@ -66,7 +66,7 @@ export class PondEcology {
   update(time,weather,season,fish){
     const dt=clamp(time-this.lastTime,0,.1);this.lastTime=time;
     const cold=season==='winter'||this.climate.winter,calm=clamp(1-weather.rain*1.8-weather.snow*2)*clamp(1-(weather.wind-5)/8);
-    const day=cold?0:clamp((weather.light-.28)/.45)*calm;
+    const day=cold||season==='autumn'?0:clamp((weather.light-.28)/.45)*calm;
     if(this.season!==season){for(const p of this.petals){p.active=false;p.sprite.visible=false;}this.nextPetal=time+1;}
     this.activeDay=day;this.season=season;
     for(const s of this.shrimp){
@@ -107,6 +107,7 @@ export class PondEcology {
     }
     for(const d of this.dragonflies){
       d.group.visible=d.shadow.visible=day>.02;d.group.alpha=day;
+      if(!d.group.visible)continue;
       if(day>.02&&dt>0){
         if(time>=d.until||Math.hypot(d.targetX-d.x,d.targetY-d.y)<24)this.chooseFlightTarget(d,time);
         const dx=d.targetX-d.x,dy=d.targetY-d.y,distance=Math.hypot(dx,dy);
