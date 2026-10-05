@@ -36,7 +36,7 @@ export function loadSceneStyle(key) {
     const profile = PROFILES[key];
     const pending = Promise.all([profile.bottom,profile.fish,profile.shore,profile.winter,profile.lotus,profile.life].map(url => Assets.load({src:url,data:{autoGenerateMipmaps:true,minFilter:'linear',mipmapFilter:'linear'}})))
       .then(([bottom,atlas,shore,winter,lotus,life]) => ({
-        key, bottom, shore, winter, lotus, life, layout: profile.layout,
+        key, bottom, shore, winter, lotus, life, layout: {...profile.layout,style:key},
         surface: createSurfaceOcclusion(bottom,key),
         fishTextures: (key==='cartoon'?Array.from({length:6},(_,i)=>[i%2*768,Math.floor(i/2)*1024/3,768,1024/3]):FISH_FRAMES).map(([x,y,width,height]) => new Texture({
           source: atlas.source,

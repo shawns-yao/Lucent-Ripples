@@ -2,11 +2,11 @@ import { Container, Sprite, Texture, Rectangle, Graphics } from 'pixi.js';
 import { rng, WORLD } from './simulation.js';
 import { STATIC_PADS, SHORE } from './pond-surface.js';
 import { createFoliageFilter, setFoliageSeason } from './tree-seasons.js';
+import { ecologyArt } from './ecology-art.js';
 
 const TAU = Math.PI * 2;
 const clamp = (value, low = 0, high = 1) => Math.max(low, Math.min(high, value));
 const finite = (value, fallback) => Number.isFinite(value) ? value : fallback;
-const fract = value => value - Math.floor(value);
 const mixColor = (dark, bright, amount) => {
   let color = 0;
   for (const shift of [16, 8, 0]) {
@@ -67,11 +67,11 @@ export class ShoreLife {
     const random = rng(84627);
     this.random=random;this.lastTime=0;
     this.bees = Array.from({ length: 7 }, (_, index) => {
-      const sprite = this.makeInsect(this.textures[2]);
+      const sprite = this.makeBee();
       const shadow=new Graphics().ellipse(0,0,2.8,1).fill({color:0x263f32,alpha:.15});this.shadowLayer.addChild(shadow);
-      return { sprite, shadow, index, phase: random() * TAU, delay: random() * 31,
-        period: 20 + random() * 15, reach: 82 + random() * 140,
-        drift: -.4 + random() * 1.25, size: 7.5 + random() * 2.2 };
+      return { sprite, shadow, index, phase: random()*TAU,size:11+random()*2,
+        x:0,y:0,height:0,heading:0,targetX:0,targetY:0,landingHeight:0,
+        state:'hive',until:1+index*1.3,flowerId:null,visits:0,departures:0,returns:0 };
     });
     this.butterflies = Array.from({ length: 5 }, (_, index) => {
       const sprite = this.makeButterfly(this.textures[3]);
@@ -128,18 +128,19 @@ export class ShoreLife {
       tree.sprite.anchor.set(...anchors[i]);tree.winterSprite.anchor.copyFrom(tree.sprite.anchor);
       tree.sprite.width=tree.winterSprite.width=tree.width;tree.sprite.height=tree.winterSprite.height=tree.height;
     }
-    for(const bee of this.bees||[])bee.sprite.texture=this.textures[2];
+    this.beeArt=ecologyArt(layout.style||'natural');
+    for(const bee of this.bees||[]){bee.sprite.body.texture=this.beeArt.bee;for(const wing of bee.sprite.wings)wing.texture=this.beeArt.beeWing;}
     for(const b of this.butterflies||[]){
       const [left,right]=b.sprite.wings;left.texture=this.butterflyTextures[0];right.texture=this.butterflyTextures[1];b.sprite.body.texture=this.butterflyTextures[2];
       left.x=-this.textures[3].width*.06;right.x=this.textures[3].width*.06;
     }
   }
 
-  makeInsect(texture) {
-    const sprite = new Sprite(texture);
-    sprite.anchor.set(.5);
-    this.insectLayer.addChild(sprite);
-    return sprite;
+  makeBee() {
+    const group=new Container();
+    group.wings=Array.from({length:4},(_,j)=>{const wing=new Sprite(this.beeArt.beeWing);wing.anchor.set(.05,.5);wing.x=j<2?1.8:.8;wing.y=j%2?-.5:.5;group.addChild(wing);return wing;});
+    group.body=new Sprite(this.beeArt.bee);group.body.anchor.set(.5);group.body.width=12;group.body.height=6;group.addChild(group.body);
+    this.insectLayer.addChild(group);return group;
   }
 
   makeButterfly(texture) {
@@ -150,22 +151,60 @@ export class ShoreLife {
     this.insectLayer.addChild(group);return group;
   }
 
-  beePoint(bee, time, hiveX, hiveY) {
-    const cycle = fract((time + bee.delay) / bee.period);
-    // Each bee spends a short time inside the hive, then flies out and back.
-    const flight = clamp(cycle / .86);
-    const excursion = Math.pow(Math.max(0, Math.sin(flight * Math.PI)), .85);
-    const along = bee.reach * excursion;
-    const weave = Math.sin(flight * TAU * 2 + bee.phase) * 19 * excursion;
-    return {
-      x: hiveX + along * .87 + weave,
-      y: hiveY + along * bee.drift + Math.sin(flight * TAU + bee.phase) * 29 * excursion,
-      alpha: cycle < .86 ? clamp(excursion * 5) : 0,
-    };
+  chooseBeeTarget(bee,time) {
+    bee.flowerId=null;
+    if(bee.visits>=2||(bee.visits>0&&this.random()<.4)){
+      bee.state='return';bee.targetX=this.hive.x;bee.targetY=this.hive.y;bee.landingHeight=0;return;
+    }
+    const free=(x,y)=>Math.hypot(x-bee.x,y-bee.y)>45&&!this.canopyAt(x,y,5)&&
+      !this.bees.some(b=>b!==bee&&b.state!=='hive'&&Math.hypot(b.targetX-x,b.targetY-y)<22)&&
+      !this.butterflies.some(b=>b.flowerId!==null&&Math.hypot(b.targetX-x,b.targetY-y)<22);
+    let site=null,count=0;
+    for(const p of this.flowerSites||[])if(p.available&&free(p.x,p.y)&&this.random()<1/++count)site=p;
+    if(site){bee.flowerId=site.id;bee.targetX=site.x;bee.targetY=site.y;bee.landingHeight=site.height;}
+    else{
+      const start=Math.floor(this.random()*STATIC_PADS.length);let pad=null;
+      for(let i=0;i<STATIC_PADS.length;i++){const p=STATIC_PADS[(start+i)%STATIC_PADS.length];if(free(p[0],p[1])){pad=p;break;}}
+      if(!pad){bee.state='return';bee.landingHeight=0;return;}
+      bee.targetX=pad[0];bee.targetY=pad[1];bee.landingHeight=0;
+    }
+    bee.state='forage';bee.departures++;bee.until=time+18;
+  }
+
+  flyBee(bee,time,dt) {
+    if(bee.state==='hive'){
+      bee.x=this.hive.x;bee.y=this.hive.y;bee.height=0;
+      if(time<bee.until)return;
+      bee.visits=0;this.chooseBeeTarget(bee,time);
+    }
+    if(bee.flowerId!==null){
+      const site=this.flowerSites?.find(p=>p.id===bee.flowerId&&p.available);
+      if(site){bee.targetX=site.x;bee.targetY=site.y;bee.landingHeight=site.height;}
+      else this.chooseBeeTarget(bee,time);
+    }
+    if(bee.state==='rest'){
+      bee.x=bee.targetX;bee.y=bee.targetY;bee.height=bee.landingHeight;
+      if(time<bee.until)return;
+      this.chooseBeeTarget(bee,time);
+    }
+    if(bee.state==='return'){bee.targetX=this.hive.x;bee.targetY=this.hive.y;}
+    else if(time>=bee.until){bee.visits=2;this.chooseBeeTarget(bee,time);}
+    const dx=bee.targetX-bee.x,dy=bee.targetY-bee.y,distance=Math.hypot(dx,dy);
+    const desired=Math.atan2(dy,dx)+(distance>65?Math.sin(time*4+bee.phase)*.17:0);
+    bee.heading+=Math.atan2(Math.sin(desired-bee.heading),Math.cos(desired-bee.heading))*Math.min(1,dt*7);
+    const speed=Math.min(distance*4,100+Math.sin(time*2.4+bee.phase)*22),step=Math.min(distance,speed*dt);
+    bee.x+=Math.cos(bee.heading)*step;bee.y+=Math.sin(bee.heading)*step;
+    const altitude=bee.landingHeight+clamp(distance/85)*(30+Math.sin(time*4+bee.phase)*6);
+    bee.height+=(altitude-bee.height)*Math.min(1,dt*5);
+    if(distance<2&&Math.abs(bee.height-bee.landingHeight)<1.5){
+      bee.x=bee.targetX;bee.y=bee.targetY;bee.height=bee.landingHeight;
+      if(bee.state==='return'){bee.state='hive';bee.until=time+3+this.random()*7;bee.returns++;}
+      else{bee.state='rest';bee.visits++;bee.until=time+2+this.random()*4;}
+    }
   }
 
   butterflyPerch(b) {
-    const flowers=(this.flowerSites||[]).filter(p=>p.available&&!this.canopyAt(p.x,p.y)&&
+    const flowers=(this.flowerSites||[]).filter(p=>p.available&&!this.canopyAt(p.x,p.y)&&!this.bees.some(bee=>bee.flowerId===p.id)&&
       !this.butterflies.some(other=>other!==b&&other.flowerId===p.id));
     flowers.sort((a,c)=>Math.hypot(a.x-b.x,a.y-b.y)-Math.hypot(c.x-b.x,c.y-b.y));
     if(flowers.length){const p=flowers[0];b.flowerId=p.id;b.perchKind='flower';b.landingHeight=p.height;b.targetX=p.x;b.targetY=p.y;return;}
@@ -266,19 +305,20 @@ export class ShoreLife {
     for(let i=0;i<2;i++){this.treeShadows[i].position.copyFrom(this.trees[i].group.position);this.treeShadows[i].alpha=shadowAlpha;}
 
     for (const bee of this.bees) {
-      const point = this.beePoint(bee, time, this.hive.x, this.hive.y);
-      const next = this.beePoint(bee, time + .04, this.hive.x, this.hive.y);
+      if(day>.005&&dt>0)this.flyBee(bee,time,dt);
       const sprite = bee.sprite;
-      const flightHeight=(20+Math.sin(time*6+bee.phase)*6+Math.sin(time*2+bee.phase)*5)*point.alpha;
-      sprite.position.set(clamp(point.x, 8, width - 8), clamp(point.y-flightHeight, 8, height - 8));
-      sprite.rotation = Math.atan2(next.y - point.y, next.x - point.x) + Math.PI / 2;
-      const base = bee.size / sprite.texture.width;
-      sprite.scale.set(base * (.76 + Math.abs(Math.sin(time * 66 + bee.phase)) * .24), base);
-      sprite.alpha = day * point.alpha * .91;
+      const resting=bee.state==='rest',hidden=bee.state==='hive';
+      sprite.position.set(bee.x,bee.y-bee.height);sprite.rotation=bee.heading;sprite.scale.set(bee.size/12);
+      for(let j=0;j<4;j++){
+        const side=j%2?-1:1,front=j<2,beat=resting?0:Math.sin(time*91+bee.phase+(front?0:1.3));
+        sprite.wings[j].rotation=side*((resting?2.2:front?1.1:1.85)+beat*.23);
+        sprite.wings[j].scale.set((front?6.5:4.8)/96*(resting?1:.85+Math.abs(beat)*.15),side*(front?3:2.5)/32);
+      }
+      sprite.alpha = hidden?0:day*.91;
       sprite.tint = insectTint;
       sprite.visible = sprite.alpha > .005;
-      bee.shadow.position.set(point.x+flightHeight*.24,point.y+flightHeight*.15);bee.shadow.scale.set(1+flightHeight*.015);
-      bee.shadow.alpha=day*point.alpha*.4/(1+flightHeight*.035);bee.shadow.visible=sprite.visible;
+      bee.shadow.position.set(bee.x+bee.height*.24,bee.y+(resting?-bee.height+1:bee.height*.15));bee.shadow.scale.set(1+bee.height*.015);
+      bee.shadow.alpha=day*.4/(1+bee.height*.035);bee.shadow.visible=sprite.visible;
     }
 
     for (const butterfly of this.butterflies) {
@@ -318,7 +358,7 @@ export class ShoreLife {
     return this.activity;
   }
 
-  snapshot(){return {season:this.season,beesVisible:this.bees.filter(b=>b.sprite.visible).length,butterfliesVisible:this.butterflies.filter(b=>b.sprite.visible).length,firefliesVisible:this.fireflyLayer.visible?this.fireflies.filter(f=>f.sprite.alpha>.01).length:0,winterTrees:this.trees.map(t=>t.winterSprite.alpha),winterAmount:this.winterAmount||0};}
+  snapshot(){return {season:this.season,beesVisible:this.bees.filter(b=>b.sprite.visible).length,bees:this.bees.map(b=>({id:b.index,x:b.x,y:b.y,height:b.height,state:b.state,targetX:b.targetX,targetY:b.targetY,flowerId:b.flowerId,departures:b.departures,returns:b.returns,visible:b.sprite.visible})),butterfliesVisible:this.butterflies.filter(b=>b.sprite.visible).length,firefliesVisible:this.fireflyLayer.visible?this.fireflies.filter(f=>f.sprite.alpha>.01).length:0,winterTrees:this.trees.map(t=>t.winterSprite.alpha),winterAmount:this.winterAmount||0};}
 
   canopyAt(x,y,clearance=18) {
     for(const tree of this.trees) {
