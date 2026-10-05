@@ -5,11 +5,11 @@ import {LotusGrowth,DAY_MS,LOTUS_STORAGE_KEY,MAX_LOTUS,lotusStage,lotusAppearanc
 import {isOpenWater} from '../src/pond-surface.js';
 const START=Date.UTC(2026,9,2,12);
 function storage(){const data=new Map();return {data,getItem:key=>data.get(key)??null,setItem:(key,value)=>data.set(key,value)};}
-test('random plants stay in suitable water, apart, bounded and stable after refresh',()=>{
+test('clustered plants stay in suitable water, apart, bounded and stable after refresh',()=>{
  for(let seed=0;seed<80;seed++){
   const store=storage(),g=new LotusGrowth({storage:store,now:()=>START,seed});
   assert.equal(g.plants.length,MAX_LOTUS);
-  for(const [i,p] of g.plants.entries()){assert.ok(isOpenWater(p.x,p.y,38));assert.ok(g.plants.slice(0,i).every(o=>Math.hypot(o.x-p.x,o.y-p.y)>=128));}
+  for(const [i,p] of g.plants.entries()){assert.ok(isOpenWater(p.x,p.y,28));assert.ok(g.plants.slice(0,i).every(o=>Math.hypot(o.x-p.x,o.y-p.y)>=54));}
   const restored=new LotusGrowth({storage:store,now:()=>START,seed:999});assert.deepEqual(restored.snapshot(),g.snapshot());
  }
  const a=new LotusGrowth({storage:storage(),now:()=>START,seed:1}),b=new LotusGrowth({storage:storage(),now:()=>START,seed:2});assert.notDeepEqual(a.plants.map(p=>[p.x,p.y]),b.plants.map(p=>[p.x,p.y]));

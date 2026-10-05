@@ -60,13 +60,10 @@ test('fish sustain distinct faster paces with independently changing bursts and 
   restFrames+=resting;maxResting=Math.max(maxResting,resting);
  }
  const mean=total/(120*60*44),means=totals.map(n=>n/(120*60));
- // The default seed averages ~47 units/s INCLUDING full stops, compared with
- // the original default-seed ~27.3 units/s (~1.72x overall). Cruise bases are
- // 44–78, and observed bursts reach ~103.
  assert.ok(mean>43&&mean<56,`Mean pace including rests: ${mean}`);
  assert.ok(Math.max(...means)-Math.min(...means)>20,'individual long-run paces remain visibly different');
  assert.ok(maxSpeed>85&&maxSpeed<=FISH_MOTION.maxSpeed,'some fish visibly burst above cruise pace');
- assert.deepEqual(states,new Set(['cruise','glide','burst','settling','rest']));
+ assert.deepEqual(states,new Set(['cruise','glide','burst','seeking','settling','rest']));
  assert.ok(restFrames/(120*60*44)>.04&&restFrames/(120*60*44)<.16,'rests are occasional');
  assert.ok(maxResting<22,'there is never a synchronized whole-school stop');
  assert.ok(new Set(sim.fish.map(f=>f.nextRestAt)).size===44,'each fish owns its rest schedule');

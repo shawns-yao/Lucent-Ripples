@@ -30,7 +30,8 @@ test('new lotus leaves occlude rain ripples and a stable seed gives stable frame
  const blocked=precipitationFrame(12,wet,[{x:p.x,y:p.y,age:4}]);assert.ok(!blocked.impacts.some(i=>i.id===p.id));assert.deepEqual(frame,precipitationFrame(12,wet));
 });
 test('Pixi weather and lotus layers update safely through weather, crop and stage transitions',()=>{
- const stage=new Container(),effects=new WeatherEffects(stage),source=new TextureSource({width:1536,height:1024}),atlas=new Texture({source}),growth=new LotusGrowth({storage:null,seed:4,now:()=>1780000000000}),lotus=new LotusVisuals(stage,atlas,growth);
+ const stage=new Container(),shadows=new Container();stage.addChild(shadows);
+ const effects=new WeatherEffects(stage),source=new TextureSource({width:1536,height:1024}),atlas=new Texture({source}),growth=new LotusGrowth({storage:null,seed:4,now:()=>1780000000000}),lotus=new LotusVisuals(stage,atlas,growth,shadows);
  for(const view of [{scaleX:1,scaleY:.9,x:0,y:0},{scaleX:.92,scaleY:.83,x:-580,y:0}])for(const time of [0,1,17,250]){const frame=effects.update(time,wet,view,growth.plants);lotus.update(time,wet);assert.ok(frame.shaderImpacts.length<=16);for(const plant of lotus.plants)assert.ok(Number.isFinite(plant.group.x+plant.group.y));}
  assert.equal(lotus.plants.length,8);assert.equal(lotus.plants.filter(v=>v.group.visible).length,4);stage.destroy({children:true});atlas.destroy(true);
 });
