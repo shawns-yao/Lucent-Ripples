@@ -88,6 +88,7 @@ export class LotusVisuals {
       this.shadows.addChild(shadow);this.companionLayer.addChild(leaf);return {leaf,shadow};
     });
     this.flowerSites=growth.plants.map(p=>({id:p.id,x:p.x+12,y:p.y,height:14,available:false}));
+    this.flowerObstacles=growth.plants.map(p=>({id:p.id,x:p.x+12,y:p.y-14,radius:0}));
     this.plants=growth.plants.map(p=>{
       const group=new Container();group.position.set(p.x,p.y);this.container.addChild(group);
       const leaves=new Container(),flower=new Container();group.addChild(leaves,flower);
@@ -135,6 +136,7 @@ export class LotusVisuals {
       v.shadow.texture=this.textures[Math.round(leafStage)];v.shadow.visible=visible&&!dormant;v.shadow.position.set(v.group.x+5,v.group.y+7);v.shadow.scale.set(v.leaves.scale.x*1.04);v.shadow.rotation=v.leaves.rotation;
       v.flowerShadow.texture=this.textures[3+Math.round(bloomStage)];v.flowerShadow.visible=visible&&v.flower.visible;v.flowerShadow.position.set(v.group.x+18,v.group.y+5);v.flowerShadow.scale.set(v.flower.scale.x*1.08);
       const site=this.flowerSites[i];site.x=v.group.x+12;site.y=v.group.y;site.available=v.flower.visible&&visible&&bloomScale>.7&&bloomStage>.7;
+      const obstacle=this.flowerObstacles[i];obstacle.x=v.group.x+12;obstacle.y=v.group.y-14;obstacle.radius=v.group.visible&&v.flower.visible?25*bloomScale:0;
     });
   }
   snapshot(){return {season:this.season,dormant:this.season==='winter',companions:this.companions.map(({leaf})=>({x:leaf.x,y:leaf.y,width:leaf.width,height:leaf.height,withered:Boolean(this.companionLayer.filters?.length)})),plants:this.plants.map((v,i)=>({id:this.growth.plants[i].id,visible:v.group.visible,flowerVisible:v.group.visible&&v.flower.visible&&v.flower.scale.x>0,withered:Boolean(v.leaves.filters?.length)}))};}

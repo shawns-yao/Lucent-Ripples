@@ -57,7 +57,7 @@ export class PondLife {
     const perches=[];
     const add=(x,y,rx,ry,kind)=>{
       for(const [dx,dy] of [[0,0],[-Math.max(0,rx-22)*.85,0],[Math.max(0,rx-22)*.85,0],[0,-Math.max(0,ry-22)*.85],[0,Math.max(0,ry-22)*.85]]) {
-        if(!this.canopyAt(x+dx,y+dy)&&this.climate.iceAt(x+dx,y+dy)<.2)perches.push({x:x+dx,y:y+dy,cx:x,cy:y,rx,ry,kind});
+        if(!this.canopyAt(x+dx,y+dy)&&this.climate.iceAt(x+dx,y+dy)<.2&&this.flowerClear(x+dx,y+dy))perches.push({x:x+dx,y:y+dy,cx:x,cy:y,rx,ry,kind});
       }
     };
     for(const p of STATIC_PADS)if(Math.min(p[2],p[3])>=24)add(...p,'leaf');
@@ -65,15 +65,29 @@ export class PondLife {
     for(const p of this.climate.leaves)if(p.radius>=24)add(p.x,p.y,p.radius,p.radius,'leaf');
     return perches;
   }
+  flowerClear(x,y) {
+    // Include the crouched body, spread legs and small wind-driven flower sway.
+    return (this.flowers||[]).every(p=>p.radius<=0||Math.hypot(x-p.x,y-p.y)>p.radius+23);
+  }
+  flightClear(frog,x,y) {
+    const distance=Math.hypot(x-frog.x,y-frog.y),height=20+distance*.065,steps=Math.max(8,Math.ceil(distance/12));
+    const leavingFlower=!this.flowerClear(frog.x,frog.y);
+    for(let i=1;i<=steps;i++){
+      const t=i/steps;
+      if(leavingFlower&&t<.3)continue;
+      if(!this.flowerClear(frog.x+(x-frog.x)*t,frog.y+(y-frog.y)*t-Math.sin(t*Math.PI)*height))return false;
+    }
+    return true;
+  }
   landingFree(frog,x,y) {
-    return this.frogs.every(other=>other===frog||(
+    return this.flowerClear(x,y)&&this.frogs.every(other=>other===frog||(
       Math.hypot(x-other.x,y-other.y)>=FROG_SPACING&&
       (!other.perch||Math.hypot(x-other.perch.x,y-other.perch.y)>=FROG_SPACING)&&
       (!(other.state==='prepare'||other.state==='jump')||Math.hypot(x-other.targetX,y-other.targetY)>=FROG_SPACING)
     ));
   }
   jump(frog,time,startled=false) {
-    const reachable=this.perches().filter(p=>{const d=Math.hypot(p.x-frog.x,p.y-frog.y);return d>110&&d<420&&this.landingFree(frog,p.x,p.y);});
+    const reachable=this.perches().filter(p=>{const d=Math.hypot(p.x-frog.x,p.y-frog.y);return d>110&&d<420&&this.landingFree(frog,p.x,p.y)&&this.flightClear(frog,p.x,p.y);});
     if(reachable.length&&(startled||this.random()<.86)) {
       const p=reachable[Math.floor(this.random()*reachable.length)];this.prepareJump(frog,p.x,p.y,p.kind,startled,p);return;
     }
@@ -81,7 +95,7 @@ export class PondLife {
     for(let attempt=0;attempt<24;attempt++) {
       const a=direction+(this.random()-.5)*1.4,length=120+this.random()*110;
       const x=frog.x+Math.cos(a)*length,y=frog.y+Math.sin(a)*length;
-      if(isWater(x,y,10)&&this.climate.surfaceAt(x,y)==='water'&&!this.canopyAt(x,y)&&this.climate.iceAt(x,y)<.15&&this.landingFree(frog,x,y)) {
+      if(isWater(x,y,10)&&this.climate.surfaceAt(x,y)==='water'&&!this.canopyAt(x,y)&&this.climate.iceAt(x,y)<.15&&this.landingFree(frog,x,y)&&this.flightClear(frog,x,y)) {
         this.prepareJump(frog,x,y,'water',startled);return;
       }
     }
@@ -106,12 +120,12 @@ export class PondLife {
       const direction=Math.atan2(frog.y-p.cy,frog.x-p.cx);
       for(const offset of [0,-Math.PI/4,Math.PI/4,-Math.PI/2,Math.PI/2]) {
         const a=direction+offset,x=p.cx+Math.cos(a)*(p.rx+18),y=p.cy+Math.sin(a)*(p.ry+18),d=Math.hypot(x-frog.x,y-frog.y);
-        if(d>=score||!isWater(x,y,4)||this.climate.surfaceAt(x,y)!=='water'||this.canopyAt(x,y)||this.climate.iceAt(x,y)>=.15)continue;
+        if(d>=score||!isWater(x,y,4)||this.climate.surfaceAt(x,y)!=='water'||this.canopyAt(x,y)||this.climate.iceAt(x,y)>=.15||!this.flightClear({x,y},p.x,p.y))continue;
         let clear=true;
         const steps=Math.max(1,Math.ceil(d/12));
         for(let i=1;i<=steps;i++) {
           const t=i/steps,qx=frog.x+(x-frog.x)*t,qy=frog.y+(y-frog.y)*t;
-          if(!isWater(qx,qy,2)||this.climate.surfaceAt(qx,qy)!=='water'||this.climate.iceAt(qx,qy)>=.15){clear=false;break;}
+          if(!isWater(qx,qy,2)||this.climate.surfaceAt(qx,qy)!=='water'||this.climate.iceAt(qx,qy)>=.15||!this.flowerClear(qx,qy)){clear=false;break;}
         }
         if(clear){best={perch:p,x,y};score=d;}
       }
@@ -155,7 +169,7 @@ export class PondLife {
       f.alpha+=(active-f.alpha)*Math.min(1,dt*1.6);f.group.alpha=f.alpha*light;f.group.visible=f.group.alpha>.015;
       f.group.visible=f.group.visible&&!this.seasonWinter&&!this.climate.winter&&weather.temp>=6;
       if(active>.25||f.state==='jump'||f.state==='prepare') {
-        if(active>.25&&f.state==='rest'&&time>=f.until)this.jump(f,time);
+        if(active>.25&&f.state==='rest'&&(time>=f.until||!this.flowerClear(f.x,f.y)))this.jump(f,time);
         if(f.state==='prepare'){f.elapsed+=dt;if(f.elapsed>=f.preparation){f.state='jump';f.elapsed=0;}}
         if(f.state==='jump') {
           f.elapsed+=dt;const p=clamp(f.elapsed/f.duration);
@@ -165,7 +179,8 @@ export class PondLife {
           if(time>f.until||(f.perch&&!this.landingFree(f,f.perch.x,f.perch.y)))this.swimTarget(f,time);
           const dx=f.targetX-f.x,dy=f.targetY-f.y,d=Math.hypot(dx,dy),speed=(32+Math.sin(time*5+f.phase)*10)*dt;
           if(f.perch&&d<4) {
-            const p=f.perch;this.splash(f.x,f.y,time);this.prepareJump(f,p.x,p.y,p.kind,false,p);
+            const p=f.perch;
+            if(this.landingFree(f,p.x,p.y)&&this.flightClear(f,p.x,p.y)){this.splash(f.x,f.y,time);this.prepareJump(f,p.x,p.y,p.kind,false,p);}else this.swimTarget(f,time);
           } else if(d>=4) {
             f.heading=turn(f.heading,Math.atan2(dy,dx),Math.min(1,dt*4));
             const x=f.x+dx/d*Math.min(d,speed),y=f.y+dy/d*Math.min(d,speed);

@@ -69,6 +69,7 @@ const shoreWorld=new Container();app.stage.addChild(shoreWorld);
 const shore=new ShoreLife(shoreWorld,initialStyle.shore,initialStyle.winter,initialStyle.layout);
 shore.flowerSites=lotus.flowerSites;
 const life=new PondLife(world,shoreWorld,initialStyle.life,climate,(x,y)=>shore.canopyAt(x,y));
+life.flowers=lotus.flowerObstacles;
 const vegetation=new PondVegetation(world,fishes,initialStyle.key);
 const ecology=new PondEcology({world,fishLayer:vegetation.container,shoreWorld,climate,flowers:lotus.flowerSites,canopy:(x,y,clearance)=>shore.canopyAt(x,y,clearance),style:initialStyle.key});
 const atmosphere=new WeatherEffects(app.stage,climate);
@@ -281,6 +282,7 @@ window.__pond={get ready(){return ready},get renderer(){return app.renderer.name
 window.__pond.shoreLife=()=>shore.snapshot();
 window.__pond.plantsDisplay=()=>lotus.snapshot();
 window.__pond.winterScene=()=>({active:shownWinter,remnants:winterRemnants.visible,probes:[[260,260],[400,180],[1450,260],[1320,750],[650,355],[1000,500]].map(([x,y])=>({x,y,ice:climate.iceAt(x,y),surface:climate.surfaceAt(x,y)})),fishAlpha:visuals.map(v=>v.mesh.alpha)});
+window.__pond.flowerObstacles=()=>lotus.flowerObstacles.map(p=>({...p}));
 window.__pond.appearance=()=>appearance.snapshot();
 window.__pond.seasons=()=>seasons.snapshot();
 window.__pond.precipitationBudget=()=>({season:atmosphere.frame.season,rainBudget:atmosphere.frame.rainBudget,rainCount:atmosphere.frame.rainCount,snowCount:atmosphere.frame.snowCount,drawnRain:atmosphere.rain.particleChildren.length,drawnSnow:atmosphere.snow.particleChildren.length,rings:atmosphere.frame.impacts.length});
